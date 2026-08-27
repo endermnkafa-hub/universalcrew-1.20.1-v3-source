@@ -8,8 +8,8 @@ import net.minecraftforge.network.NetworkEvent;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Supplier;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 public record CrewMembersPacket(
         String crewName,
@@ -19,7 +19,9 @@ public record CrewMembersPacket(
     public record MemberData(
             UUID id,
             String name,
-            String state
+            String state,
+            float health,
+            float maxHealth
     ) {
     }
 
@@ -43,13 +45,19 @@ public record CrewMembersPacket(
                                 : msg.members().size()
                 );
 
-        buf.writeVarInt(count);
+        buf.writeVarInt(
+                count
+        );
 
         if (msg.members() == null) {
             return;
         }
 
-        for (int i = 0; i < count; i++) {
+        for (
+                int i = 0;
+                i < count;
+                i++
+        ) {
 
             MemberData member =
                     msg.members().get(i);
@@ -71,6 +79,14 @@ public record CrewMembersPacket(
                             : member.state(),
                     16
             );
+
+            buf.writeFloat(
+                    member.health()
+            );
+
+            buf.writeFloat(
+                    member.maxHealth()
+            );
         }
     }
 
@@ -79,7 +95,9 @@ public record CrewMembersPacket(
     ) {
 
         String crewName =
-                buf.readUtf(32);
+                buf.readUtf(
+                        32
+                );
 
         int count =
                 Math.min(
@@ -103,16 +121,28 @@ public record CrewMembersPacket(
                     buf.readUUID();
 
             String name =
-                    buf.readUtf(128);
+                    buf.readUtf(
+                            128
+                    );
 
             String state =
-                    buf.readUtf(16);
+                    buf.readUtf(
+                            16
+                    );
+
+            float health =
+                    buf.readFloat();
+
+            float maxHealth =
+                    buf.readFloat();
 
             members.add(
                     new MemberData(
                             id,
                             name,
-                            state
+                            state,
+                            health,
+                            maxHealth
                     )
             );
         }
@@ -133,10 +163,6 @@ public record CrewMembersPacket(
 
         ctx.enqueueWork(() -> {
 
-            // ---------------------------------------------
-            // Client verisini güncelle
-            // ---------------------------------------------
-
             List<ClientCrewState.Member> converted =
                     new ArrayList<>();
 
@@ -149,7 +175,9 @@ public record CrewMembersPacket(
                         new ClientCrewState.Member(
                                 member.id(),
                                 member.name(),
-                                member.state()
+                                member.state(),
+                                member.health(),
+                                member.maxHealth()
                         )
                 );
             }
@@ -160,10 +188,6 @@ public record CrewMembersPacket(
             ClientCrewState.replaceMembers(
                     converted
             );
-
-            // ---------------------------------------------
-            // Açık Crew GUI'sini anında yenile
-            // ---------------------------------------------
 
             Minecraft minecraft =
                     Minecraft.getInstance();
@@ -177,6 +201,8 @@ public record CrewMembersPacket(
             }
         });
 
-        ctx.setPacketHandled(true);
+        ctx.setPacketHandled(
+                true
+        );
     }
 }
