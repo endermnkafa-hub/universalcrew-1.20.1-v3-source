@@ -117,32 +117,13 @@ public record CrewMembersPacket(
                 i++
         ) {
 
-            UUID id =
-                    buf.readUUID();
-
-            String name =
-                    buf.readUtf(
-                            128
-                    );
-
-            String state =
-                    buf.readUtf(
-                            16
-                    );
-
-            float health =
-                    buf.readFloat();
-
-            float maxHealth =
-                    buf.readFloat();
-
             members.add(
                     new MemberData(
-                            id,
-                            name,
-                            state,
-                            health,
-                            maxHealth
+                            buf.readUUID(),
+                            buf.readUtf(128),
+                            buf.readUtf(16),
+                            buf.readFloat(),
+                            buf.readFloat()
                     )
             );
         }
