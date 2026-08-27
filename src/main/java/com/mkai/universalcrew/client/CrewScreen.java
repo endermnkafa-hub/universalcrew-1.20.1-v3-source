@@ -1,4 +1,4 @@
-package com.mkai.universalcrew.client;
+apackage com.mkai.universalcrew.client;
 
 import com.mkai.universalcrew.network.CrewCommandPacket;
 import com.mkai.universalcrew.network.CrewCreatePacket;
