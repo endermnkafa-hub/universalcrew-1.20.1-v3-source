@@ -1,8 +1,0 @@
-Manifest-Version: 1.0
-Specification-Title: UniversalCrew
-Specification-Vendor: MKAI
-Specification-Version: 1
-Implementation-Title: UniversalCrew
-Implementation-Version: 1.0.0
-Implementation-Vendor: MKAI
-
