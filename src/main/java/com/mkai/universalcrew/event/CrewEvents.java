@@ -2676,7 +2676,192 @@ public final class CrewEvents {
                     );
         }
     }
+    // =========================================================
+// TAYFA ÜYESİ İYİLEŞTİR
+// =========================================================
 
+public static void healRecruit(
+        ServerPlayer captain,
+        UUID memberId
+) {
+
+    if (!hasCrew(captain)) {
+        return;
+    }
+
+    if (memberId == null) {
+        return;
+    }
+
+    RosterEntry entry =
+            null;
+
+    for (
+            RosterEntry rosterEntry :
+            readRoster(captain)
+    ) {
+
+        if (
+                rosterEntry.uuid()
+                        .equals(
+                                memberId
+                        )
+        ) {
+
+            entry =
+                    rosterEntry;
+
+            break;
+        }
+    }
+
+    if (entry == null) {
+
+        msg(
+                captain,
+                "Bu tayfa üyesi bulunamadı.",
+                ChatFormatting.RED
+        );
+
+        return;
+    }
+
+    Mob mob =
+            findRecruit(
+                    captain.getServer(),
+                    captain,
+                    entry
+            );
+
+    /*
+     * Ölü üye.
+     */
+    if (
+            mob == null
+                    || !mob.isAlive()
+    ) {
+
+        ListTag roster =
+                getRoster(
+                        captain.getPersistentData()
+                );
+
+        removeRosterEntry(
+                roster,
+                memberId
+        );
+
+        captain.getPersistentData()
+                .put(
+                        ROSTER,
+                        roster
+                );
+
+        msg(
+                captain,
+                "Bu tayfa üyesi artık hayatta değil.",
+                ChatFormatting.RED
+        );
+
+        sendCrewMembers(
+                captain
+        );
+
+        return;
+    }
+
+    float missing =
+            mob.getMaxHealth()
+                    - mob.getHealth();
+
+    /*
+     * Zaten full can.
+     */
+    if (missing <= 0.0F) {
+
+        msg(
+                captain,
+                mob.getName()
+                        .getString()
+                        + " zaten full can.",
+                ChatFormatting.YELLOW
+        );
+
+        return;
+    }
+
+    /*
+     * 1 kalp = 2 HP.
+     */
+    int missingHearts =
+            (int)Math.ceil(
+                    missing / 2.0F
+            );
+
+    /*
+     * Envanterdeki pişmiş et.
+     */
+    int availableBeef =
+            countItem(
+                    captain,
+                    Items.COOKED_BEEF
+            );
+
+    if (availableBeef <= 0) {
+
+        msg(
+                captain,
+                "Envanterinde pişmiş et yok.",
+                ChatFormatting.RED
+        );
+
+        return;
+    }
+
+    /*
+     * 1 pişmiş et = 1 kalp.
+     */
+    int hearts =
+            Math.min(
+                    missingHearts,
+                    availableBeef
+            );
+
+    /*
+     * Kullanılacak et.
+     */
+    removeItems(
+            captain,
+            Items.COOKED_BEEF,
+            hearts
+    );
+
+    /*
+     * Her et 2 HP.
+     */
+    mob.heal(
+            hearts * 2.0F
+    );
+
+    updateRosterFromEntity(
+            captain,
+            mob
+    );
+
+    msg(
+            captain,
+            mob.getName()
+                    .getString()
+                    + " "
+                    + hearts
+                    + " kalp iyileştirildi.",
+            ChatFormatting.GREEN
+    );
+
+    sendCrewMembers(
+            captain
+    );
+}
     // =========================================================
     // RECRUIT TICK
     // =========================================================
