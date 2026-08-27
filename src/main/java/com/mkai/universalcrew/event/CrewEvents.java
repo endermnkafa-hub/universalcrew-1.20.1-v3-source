@@ -2,10 +2,15 @@ package com.mkai.universalcrew.event;
 
 import com.mkai.universalcrew.registry.ModItems;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
@@ -16,6 +21,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingChangeTargetEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
@@ -46,32 +52,15 @@ public final class CrewEvents {
     private static final String RECRUITED =
             "UniversalCrewRecruited";
 
-    /*
-     * Canlının recruit edilmeden önceki gerçek adı.
-     *
-     * Örnek:
-     * Zoro
-     * Luffy
-     * Warden
-     */
     private static final String ORIGINAL_NAME =
             "UniversalCrewOriginalName";
 
-    /*
-     * ATAK komutuyla verilen gerçek hedef.
-     */
     private static final String COMBAT_TARGET =
             "UniversalCrewCombatTarget";
 
-    /*
-     * Kendisine / tayfa arkadaşına saldıran düşman.
-     */
     private static final String DEFEND_TARGET =
             "UniversalCrewDefendTarget";
 
-    /*
-     * SAVUN başlangıç noktası.
-     */
     private static final String DEFEND_X =
             "UniversalCrewDefendX";
 
@@ -84,6 +73,44 @@ public final class CrewEvents {
     private static final String DEFEND_POS_SET =
             "UniversalCrewDefendPositionSet";
 
+    /*
+     * Oyuncunun kalıcı tayfa kayıt listesi.
+     *
+     * Her üye:
+     * UUID
+     * Name
+     * Dimension
+     * X/Y/Z
+     * State
+     */
+    private static final String ROSTER =
+            "UniversalCrewRoster";
+
+    private static final String R_UUID =
+            "UUID";
+
+    private static final String R_NAME =
+            "Name";
+
+    private static final String R_DIMENSION =
+            "Dimension";
+
+    private static final String R_X =
+            "X";
+
+    private static final String R_Y =
+            "Y";
+
+    private static final String R_Z =
+            "Z";
+
+    private static final String R_STATE =
+            "State";
+
+    /*
+     * Eski tek-eşyalı istek sisteminin anahtarı.
+     * Eski save'lerin uyumluluğu için bırakıldı.
+     */
     private static final String REQ_ITEM =
             "UniversalCrewReqItem";
 
@@ -92,6 +119,15 @@ public final class CrewEvents {
 
     private static final String REQ_KNOWN =
             "UniversalCrewReqKnown";
+
+    /*
+     * Yeni çoklu gereksinim sistemi.
+     */
+    private static final String REQUIREMENTS =
+            "UniversalCrewRequirements";
+
+    private static final String REQ_GENERATED =
+            "UniversalCrewRequirementsGenerated";
 
     private static final String CREW_COUNT =
             "UniversalCrewCount";
@@ -107,6 +143,12 @@ public final class CrewEvents {
     private static final double RETURN_DISTANCE = 2.5D;
 
     private static final double TARGET_MAX_DISTANCE = 128.0D;
+
+    /*
+     * Liste güncellemesini her tick yapmıyoruz.
+     * 10 tick = 0.5 saniye.
+     */
+    private static final int ROSTER_UPDATE_INTERVAL = 10;
 
     private CrewEvents() {
     }
@@ -194,6 +236,11 @@ public final class CrewEvents {
             }
         }
 
+        /*
+         * Eski oyuncularda roster yoksa oluştur.
+         */
+        getRoster(data);
+
         msg(
                 player,
                 "⚓ " + name + " tayfası hazır!",
@@ -234,7 +281,7 @@ public final class CrewEvents {
     }
 
     // =========================================================
-    // DAVET EŞYASI
+    // DAVET
     // =========================================================
 
     public static void giveInvite(
@@ -406,43 +453,26 @@ public final class CrewEvents {
                                 STATE
                         );
 
-        // =====================================================
-        // FOLLOW
-        // =====================================================
-
         if ("follow".equals(state)) {
 
             event.setCanceled(true);
-
             return;
         }
-
-        // =====================================================
-        // STOP
-        // =====================================================
 
         if ("stop".equals(state)) {
 
             event.setCanceled(true);
-
             return;
         }
 
-        // =====================================================
-        // DEFEND
-        // =====================================================
-
         if ("defend".equals(state)) {
 
-            if (
-                    isSameCrew(
-                            mob,
-                            target
-                    )
-            ) {
+            if (isSameCrew(
+                    mob,
+                    target
+            )) {
 
                 event.setCanceled(true);
-
                 return;
             }
 
@@ -463,29 +493,21 @@ public final class CrewEvents {
             }
 
             event.setCanceled(true);
-
             return;
         }
 
-        // =====================================================
-        // ATTACK
-        // =====================================================
-
         if ("attack".equals(state)) {
 
-            if (
-                    isSameCrew(
-                            mob,
-                            target
-                    )
-            ) {
+            if (isSameCrew(
+                    mob,
+                    target
+            )) {
 
                 event.setCanceled(true);
-
                 return;
             }
 
-            UUID commandTarget =
+            UUID combatTarget =
                     readCombatTarget(
                             mob
                     );
@@ -496,10 +518,10 @@ public final class CrewEvents {
                     );
 
             if (
-                    commandTarget != null
+                    combatTarget != null
                             && target.getUUID()
                             .equals(
-                                    commandTarget
+                                    combatTarget
                             )
             ) {
 
@@ -522,7 +544,7 @@ public final class CrewEvents {
     }
 
     // =========================================================
-    // OYUNCU / TAYFA SALDIRISI
+    // SALDIRI OLAYI
     // =========================================================
 
     @SubscribeEvent
@@ -542,11 +564,11 @@ public final class CrewEvents {
         LivingEntity victim =
                 event.getEntity();
 
-        Entity sourceEntity =
+        Entity source =
                 event.getSource()
                         .getEntity();
 
-        if (!(sourceEntity
+        if (!(source
                 instanceof LivingEntity attacker)) {
 
             return;
@@ -579,64 +601,47 @@ public final class CrewEvents {
                 return;
             }
 
-            if (!(captain.level()
-                    instanceof ServerLevel level)) {
-
-                return;
-            }
-
-            List<Mob> crew =
-                    level.getEntitiesOfClass(
-                            Mob.class,
-                            captain.getBoundingBox()
-                                    .inflate(
-                                            TARGET_MAX_DISTANCE
-                                    ),
-                            mob ->
-                                    isOwnedBy(
-                                            mob,
-                                            captain
-                                    )
-                    );
+            List<RosterEntry> roster =
+                    readRoster(captain);
 
             for (
-                    Mob member :
-                    crew
+                    RosterEntry entry :
+                    roster
             ) {
 
-                String state =
-                        member.getPersistentData()
-                                .getString(
-                                        STATE
-                                );
-
-                if (!"attack".equals(state)) {
+                if (!"attack".equals(entry.state())) {
                     continue;
                 }
 
-                /*
-                 * Kaptanın vurduğu canlıyı
-                 * ATAK hedefi yap.
-                 */
+                Mob member =
+                        findRecruit(
+                                captain.getServer(),
+                                captain,
+                                entry
+                        );
+
+                if (member == null) {
+                    continue;
+                }
+
                 member.getPersistentData()
                         .putUUID(
                                 COMBAT_TARGET,
                                 victim.getUUID()
                         );
 
-                /*
-                 * Eski savunma hedefini bırak.
-                 */
                 member.getPersistentData()
                         .remove(
                                 DEFEND_TARGET
                         );
 
-                /*
-                 * Hedefi entity'nin kendi AI'sına ver.
-                 */
                 member.setTarget(
                         victim
+                );
+
+                updateRosterFromEntity(
+                        captain,
+                        member
                 );
             }
 
@@ -670,17 +675,8 @@ public final class CrewEvents {
             }
 
             List<Mob> crew =
-                    level.getEntitiesOfClass(
-                            Mob.class,
-                            captain.getBoundingBox()
-                                    .inflate(
-                                            DEFEND_RADIUS
-                                    ),
-                            mob ->
-                                    isOwnedBy(
-                                            mob,
-                                            captain
-                                    )
+                    getLoadedCrewMembers(
+                            captain
                     );
 
             for (
@@ -742,15 +738,15 @@ public final class CrewEvents {
                 return;
             }
 
-            if (!(victimMob.level()
-                    instanceof ServerLevel level)) {
+            MinecraftServer server =
+                    victimMob.getServer();
 
+            if (server == null) {
                 return;
             }
 
             ServerPlayer captain =
-                    level.getServer()
-                            .getPlayerList()
+                    server.getPlayerList()
                             .getPlayer(
                                     ownerId
                             );
@@ -771,17 +767,8 @@ public final class CrewEvents {
             }
 
             List<Mob> crew =
-                    level.getEntitiesOfClass(
-                            Mob.class,
-                            victimMob.getBoundingBox()
-                                    .inflate(
-                                            DEFEND_RADIUS
-                                    ),
-                            mob ->
-                                    isOwnedBy(
-                                            mob,
-                                            captain
-                                    )
+                    getLoadedCrewMembers(
+                            captain
                     );
 
             for (
@@ -839,79 +826,35 @@ public final class CrewEvents {
         CompoundTag data =
                 mob.getPersistentData();
 
+        /*
+         * Yeni sistem daha önce oluşturulmadıysa
+         * maksimum cana göre oluştur.
+         */
         if (!data.getBoolean(
-                REQ_KNOWN
+                REQ_GENERATED
         )) {
 
-            ItemChoice request =
-                    requestFor(
-                            mob
-                    );
-
-            data.putString(
-                    REQ_ITEM,
-                    BuiltInRegistries.ITEM
-                            .getKey(
-                                    request.item()
-                            )
-                            .toString()
-            );
-
-            data.putInt(
-                    REQ_COUNT,
-                    request.count()
-            );
-
-            data.putBoolean(
-                    REQ_KNOWN,
-                    true
+            generateRequirements(
+                    mob
             );
 
             msg(
                     player,
                     mob.getName()
                             .getString()
-                            + ": "
-                            + request.count()
-                            + "x "
-                            + request.item()
-                            .getDescription()
-                            .getString()
-                            + " getir, sonra tekrar davet et!",
+                            + " için recruit isteği oluşturuldu: "
+                            + formatRequirements(
+                            data
+                    ),
                     ChatFormatting.YELLOW
             );
 
             return;
         }
 
-        ResourceLocation id =
-                ResourceLocation.tryParse(
-                        data.getString(
-                                REQ_ITEM
-                        )
-                );
-
-        Item requested =
-                id == null
-                        ? Items.BREAD
-                        : BuiltInRegistries.ITEM
-                        .getOptional(id)
-                        .orElse(
-                                Items.BREAD
-                        );
-
-        int count =
-                Math.max(
-                        1,
-                        data.getInt(
-                                REQ_COUNT
-                        )
-                );
-
-        if (!removeItems(
+        if (!hasRequirements(
                 player,
-                requested,
-                count
+                data
         )) {
 
             msg(
@@ -919,16 +862,19 @@ public final class CrewEvents {
                     mob.getName()
                             .getString()
                             + " şunu istiyor: "
-                            + count
-                            + "x "
-                            + requested
-                            .getDescription()
-                            .getString(),
+                            + formatRequirements(
+                            data
+                    ),
                     ChatFormatting.YELLOW
             );
 
             return;
         }
+
+        removeRequirements(
+                player,
+                data
+        );
 
         recruit(
                 player,
@@ -946,58 +892,452 @@ public final class CrewEvents {
         }
     }
 
-    private record ItemChoice(
-            Item item,
-            int count
-    ) {
-    }
+    // =========================================================
+    // CANA GÖRE İSTEK OLUŞTUR
+    // =========================================================
 
-    private static ItemChoice requestFor(
+    private static void generateRequirements(
             Mob mob
     ) {
 
-        int pick =
-                Math.floorMod(
-                        mob.getUUID()
-                                .hashCode(),
-                        5
-                );
+        CompoundTag data =
+                mob.getPersistentData();
 
-        return switch (pick) {
+        double maxHealth =
+                mob.getMaxHealth();
 
-            case 0 ->
-                    new ItemChoice(
-                            Items.BREAD,
-                            4
-                    );
+        double hearts =
+                maxHealth / 2.0D;
 
-            case 1 ->
-                    new ItemChoice(
-                            Items.COOKED_BEEF,
-                            2
-                    );
+        ListTag requirements =
+                new ListTag();
 
-            case 2 ->
-                    new ItemChoice(
-                            Items.IRON_INGOT,
-                            3
-                    );
+        /*
+         * 0 - 19.99 kalp
+         */
+        if (hearts < 20.0D) {
 
-            case 3 ->
-                    new ItemChoice(
-                            Items.GOLD_INGOT,
-                            2
-                    );
+            addRequirement(
+                    requirements,
+                    Items.BREAD,
+                    3
+            );
 
-            default ->
-                    new ItemChoice(
-                            Items.EMERALD,
-                            1
-                    );
-        };
+        /*
+         * 20 - 50 kalp
+         */
+        } else if (hearts < 50.0D) {
+
+            addRequirement(
+                    requirements,
+                    Items.IRON_INGOT,
+                    64
+            );
+
+        /*
+         * 50 - 100
+         */
+        } else if (hearts < 100.0D) {
+
+            addRequirement(
+                    requirements,
+                    Items.GOLD_INGOT,
+                    32
+            );
+
+            addRequirement(
+                    requirements,
+                    Items.IRON_BLOCK,
+                    8
+            );
+
+        /*
+         * 100 - 250
+         */
+        } else if (hearts < 250.0D) {
+
+            addRequirement(
+                    requirements,
+                    Items.DIAMOND,
+                    16
+            );
+
+            addRequirement(
+                    requirements,
+                    Items.GOLD_BLOCK,
+                    16
+            );
+
+        /*
+         * 250 - 500
+         */
+        } else if (hearts < 500.0D) {
+
+            addRequirement(
+                    requirements,
+                    Items.DIAMOND_BLOCK,
+                    16
+            );
+
+            addRequirement(
+                    requirements,
+                    Items.DIAMOND,
+                    32
+            );
+
+        /*
+         * 500 - 1000
+         */
+        } else if (hearts < 1000.0D) {
+
+            addRequirement(
+                    requirements,
+                    Items.DIAMOND_BLOCK,
+                    64
+            );
+
+            addRequirement(
+                    requirements,
+                    Items.GOLD_BLOCK,
+                    16
+            );
+
+        /*
+         * 1000 - 2500
+         */
+        } else if (hearts < 2500.0D) {
+
+            addRequirement(
+                    requirements,
+                    Items.NETHERITE_INGOT,
+                    32
+            );
+
+            addRequirement(
+                    requirements,
+                    Items.DIAMOND_BLOCK,
+                    32
+            );
+
+        /*
+         * 2500 - 5000
+         */
+        } else if (hearts < 5000.0D) {
+
+            addRequirement(
+                    requirements,
+                    Items.NETHER_STAR,
+                    10
+            );
+
+            addRequirement(
+                    requirements,
+                    Items.DIAMOND_BLOCK,
+                    64
+            );
+
+        /*
+         * 5000+
+         */
+        } else {
+
+            addRequirement(
+                    requirements,
+                    Items.NETHER_STAR,
+                    20
+            );
+
+            addRequirement(
+                    requirements,
+                    Items.DIAMOND_BLOCK,
+                    128
+            );
+
+            addRequirement(
+                    requirements,
+                    Items.NETHERITE_INGOT,
+                    64
+            );
+        }
+
+        data.put(
+                REQUIREMENTS,
+                requirements
+        );
+
+        data.putBoolean(
+                REQ_GENERATED,
+                true
+        );
     }
 
-    private static boolean removeItems(
+    private static void addRequirement(
+            ListTag list,
+            Item item,
+            int count
+    ) {
+
+        CompoundTag req =
+                new CompoundTag();
+
+        req.putString(
+                "Item",
+                BuiltInRegistries.ITEM
+                        .getKey(
+                                item
+                        )
+                        .toString()
+        );
+
+        req.putInt(
+                "Count",
+                count
+        );
+
+        list.add(
+                req
+        );
+    }
+
+    private static String formatRequirements(
+            CompoundTag data
+    ) {
+
+        if (
+                !data.contains(
+                        REQUIREMENTS,
+                        Tag.TAG_LIST
+                )
+        ) {
+
+            return "belirsiz";
+        }
+
+        ListTag list =
+                data.getList(
+                        REQUIREMENTS,
+                        Tag.TAG_COMPOUND
+                );
+
+        List<String> parts =
+                new ArrayList<>();
+
+        for (
+                int i = 0;
+                i < list.size();
+                i++
+        ) {
+
+            CompoundTag req =
+                    list.getCompound(
+                            i
+                    );
+
+            ResourceLocation id =
+                    ResourceLocation.tryParse(
+                            req.getString(
+                                    "Item"
+                            )
+                    );
+
+            Item item =
+                    id == null
+                            ? Items.BREAD
+                            : BuiltInRegistries.ITEM
+                            .getOptional(id)
+                            .orElse(
+                                    Items.BREAD
+                            );
+
+            parts.add(
+                    req.getInt(
+                            "Count"
+                    )
+                            + "x "
+                            + item.getDescription()
+                            .getString()
+            );
+        }
+
+        return String.join(
+                " + ",
+                parts
+        );
+    }
+
+    private static boolean hasRequirements(
+            Player player,
+            CompoundTag data
+    ) {
+
+        if (
+                !data.contains(
+                        REQUIREMENTS,
+                        Tag.TAG_LIST
+                )
+        ) {
+
+            return false;
+        }
+
+        ListTag list =
+                data.getList(
+                        REQUIREMENTS,
+                        Tag.TAG_COMPOUND
+                );
+
+        /*
+         * Önce bütün şartların mevcut olduğunu
+         * kontrol ediyoruz.
+         */
+        for (
+                int i = 0;
+                i < list.size();
+                i++
+        ) {
+
+            CompoundTag req =
+                    list.getCompound(
+                            i
+                    );
+
+            ResourceLocation id =
+                    ResourceLocation.tryParse(
+                            req.getString(
+                                    "Item"
+                            )
+                    );
+
+            Item item =
+                    id == null
+                            ? Items.BREAD
+                            : BuiltInRegistries.ITEM
+                            .getOptional(id)
+                            .orElse(
+                                    Items.BREAD
+                            );
+
+            int count =
+                    Math.max(
+                            1,
+                            req.getInt(
+                                    "Count"
+                            )
+                    );
+
+            if (
+                    countItem(
+                            player,
+                            item
+                    ) < count
+            ) {
+
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static void removeRequirements(
+            Player player,
+            CompoundTag data
+    ) {
+
+        if (
+                player.getAbilities()
+                        .instabuild
+        ) {
+
+            return;
+        }
+
+        if (
+                !data.contains(
+                        REQUIREMENTS,
+                        Tag.TAG_LIST
+                )
+        ) {
+
+            return;
+        }
+
+        ListTag list =
+                data.getList(
+                        REQUIREMENTS,
+                        Tag.TAG_COMPOUND
+                );
+
+        for (
+                int i = 0;
+                i < list.size();
+                i++
+        ) {
+
+            CompoundTag req =
+                    list.getCompound(
+                            i
+                    );
+
+            ResourceLocation id =
+                    ResourceLocation.tryParse(
+                            req.getString(
+                                    "Item"
+                            )
+                    );
+
+            Item item =
+                    id == null
+                            ? Items.BREAD
+                            : BuiltInRegistries.ITEM
+                            .getOptional(id)
+                            .orElse(
+                                    Items.BREAD
+                            );
+
+            int count =
+                    Math.max(
+                            1,
+                            req.getInt(
+                                    "Count"
+                            )
+                    );
+
+            removeItems(
+                    player,
+                    item,
+                    count
+            );
+        }
+    }
+
+    private static int countItem(
+            Player player,
+            Item item
+    ) {
+
+        int total = 0;
+
+        for (
+                int i = 0;
+                i < player.getInventory()
+                        .getContainerSize();
+                i++
+        ) {
+
+            ItemStack stack =
+                    player.getInventory()
+                            .getItem(i);
+
+            if (stack.is(item)) {
+                total += stack.getCount();
+            }
+        }
+
+        return total;
+    }
+
+    private static void removeItems(
             Player player,
             Item item,
             int amount
@@ -1008,39 +1348,10 @@ public final class CrewEvents {
                         .instabuild
         ) {
 
-            return true;
+            return;
         }
 
         int remaining =
-                amount;
-
-        for (
-                int i = 0;
-                i < player.getInventory()
-                        .getContainerSize()
-                        && remaining > 0;
-                i++
-        ) {
-
-            ItemStack stack =
-                    player.getInventory()
-                            .getItem(i);
-
-            if (stack.is(item)) {
-
-                remaining -=
-                        Math.min(
-                                remaining,
-                                stack.getCount()
-                        );
-            }
-        }
-
-        if (remaining > 0) {
-            return false;
-        }
-
-        remaining =
                 amount;
 
         for (
@@ -1072,8 +1383,6 @@ public final class CrewEvents {
             remaining -=
                     take;
         }
-
-        return true;
     }
 
     // =========================================================
@@ -1085,18 +1394,24 @@ public final class CrewEvents {
             Mob mob
     ) {
 
-        /*
-         * Recruit edilmeden önce gerçek adını kaydet.
-         */
         String originalName =
-                mob.getName()
-                        .getString();
+                mob.getPersistentData()
+                        .getString(
+                                ORIGINAL_NAME
+                        );
 
-        mob.getPersistentData()
-                .putString(
-                        ORIGINAL_NAME,
-                        originalName
-                );
+        if (originalName.isBlank()) {
+
+            originalName =
+                    mob.getName()
+                            .getString();
+
+            mob.getPersistentData()
+                    .putString(
+                            ORIGINAL_NAME,
+                            originalName
+                    );
+        }
 
         mob.getPersistentData()
                 .putUUID(
@@ -1125,11 +1440,6 @@ public final class CrewEvents {
                         REQ_KNOWN
                 );
 
-        /*
-         * İstenen isim:
-         *
-         * <Tayfa Adı> [Canlı Adı]
-         */
         updateCrewNameTag(
                 mob,
                 player
@@ -1144,6 +1454,15 @@ public final class CrewEvents {
                 1
         );
 
+        /*
+         * Kalıcı roster'a ekle.
+         */
+        addToRoster(
+                player,
+                mob,
+                "follow"
+        );
+
         msg(
                 player,
                 "⚓ "
@@ -1154,53 +1473,214 @@ public final class CrewEvents {
     }
 
     // =========================================================
-    // CREW EGG
+    // TAYFA İSMİ
     // =========================================================
 
-    private static void storeRecruit(
-            Player player,
-            Mob mob
+    private static void updateCrewNameTag(
+            Mob mob,
+            Player captain
     ) {
 
-        ItemStack egg =
-                new ItemStack(
-                        ModItems.CREW_EGG.get()
-                );
-
-        CompoundTag data =
-                new CompoundTag();
-
-        ResourceLocation id =
-                BuiltInRegistries.ENTITY_TYPE
-                        .getKey(
-                                mob.getType()
+        String crewName =
+                captain.getPersistentData()
+                        .getString(
+                                CREW_NAME
                         );
 
-        if (id == null) {
+        if (
+                crewName == null
+                        || crewName.isBlank()
+        ) {
+
             return;
         }
 
-        data.putString(
-                "EntityType",
-                id.toString()
-        );
-
-        data.putUUID(
-                OWNER,
-                player.getUUID()
-        );
-
-        data.putString(
-                "State",
+        String originalName =
                 mob.getPersistentData()
                         .getString(
-                                STATE
-                        )
+                                ORIGINAL_NAME
+                        );
+
+        if (originalName.isBlank()) {
+
+            originalName =
+                    mob.getName()
+                            .getString();
+        }
+
+        mob.setCustomName(
+                Component.literal(
+                        "<"
+                                + crewName
+                                + "> ["
+                                + originalName
+                                + "]"
+                )
         );
 
-        /*
-         * Gerçek canlı adını egg içine kaydet.
-         */
+        mob.setCustomNameVisible(
+                true
+        );
+    }
+
+    // =========================================================
+    // CREW ROSTER
+    // =========================================================
+
+    private record RosterEntry(
+            UUID uuid,
+            String name,
+            ResourceKey<Level> dimension,
+            double x,
+            double y,
+            double z,
+            String state
+    ) {
+    }
+
+    private static ListTag getRoster(
+            CompoundTag playerData
+    ) {
+
+        if (
+                !playerData.contains(
+                        ROSTER,
+                        Tag.TAG_LIST
+                )
+        ) {
+
+            playerData.put(
+                    ROSTER,
+                    new ListTag()
+            );
+        }
+
+        return playerData.getList(
+                ROSTER,
+                Tag.TAG_COMPOUND
+        );
+    }
+
+    private static List<RosterEntry> readRoster(
+            Player player
+    ) {
+
+        List<RosterEntry> result =
+                new ArrayList<>();
+
+        ListTag roster =
+                getRoster(
+                        player.getPersistentData()
+                );
+
+        for (
+                int i = 0;
+                i < roster.size();
+                i++
+        ) {
+
+            CompoundTag entry =
+                    roster.getCompound(
+                            i
+                    );
+
+            if (!entry.hasUUID(R_UUID)) {
+                continue;
+            }
+
+            UUID uuid =
+                    entry.getUUID(
+                            R_UUID
+                    );
+
+            String name =
+                    entry.getString(
+                            R_NAME
+                    );
+
+            ResourceLocation dimensionId =
+                    ResourceLocation.tryParse(
+                            entry.getString(
+                                    R_DIMENSION
+                            )
+                    );
+
+            if (dimensionId == null) {
+                dimensionId =
+                        Level.OVERWORLD
+                                .location();
+            }
+
+            ResourceKey<Level> dimension =
+                    ResourceKey.create(
+                            net.minecraft.core.registries.Registries.DIMENSION,
+                            dimensionId
+                    );
+
+            result.add(
+                    new RosterEntry(
+                            uuid,
+                            name,
+                            dimension,
+                            entry.getDouble(R_X),
+                            entry.getDouble(R_Y),
+                            entry.getDouble(R_Z),
+                            entry.getString(R_STATE)
+                    )
+            );
+        }
+
+        return result;
+    }
+
+    private static void addToRoster(
+            Player player,
+            Mob mob,
+            String state
+    ) {
+
+        CompoundTag data =
+                player.getPersistentData();
+
+        ListTag roster =
+                getRoster(
+                        data
+                );
+
+        removeRosterEntry(
+                roster,
+                mob.getUUID()
+        );
+
+        CompoundTag entry =
+                createRosterEntry(
+                        mob,
+                        state
+                );
+
+        roster.add(
+                entry
+        );
+
+        data.put(
+                ROSTER,
+                roster
+        );
+    }
+
+    private static CompoundTag createRosterEntry(
+            Mob mob,
+            String state
+    ) {
+
+        CompoundTag entry =
+                new CompoundTag();
+
+        entry.putUUID(
+                R_UUID,
+                mob.getUUID()
+        );
+
         String originalName =
                 mob.getPersistentData()
                         .getString(
@@ -1213,245 +1693,254 @@ public final class CrewEvents {
                             .getString();
         }
 
-        data.putString(
-                "OriginalName",
+        entry.putString(
+                R_NAME,
                 originalName
         );
 
-        egg.getOrCreateTag()
-                .put(
-                        "CrewData",
-                        data
-                );
-
-        player.getInventory()
-                .placeItemBackInInventory(
-                        egg
-                );
-
-        mob.discard();
-
-        msg(
-                player,
-                "Tayfa üyesi Crew Egg'e saklandı.",
-                ChatFormatting.GREEN
+        entry.putString(
+                R_DIMENSION,
+                mob.level()
+                        .dimension()
+                        .location()
+                        .toString()
         );
+
+        entry.putDouble(
+                R_X,
+                mob.getX()
+        );
+
+        entry.putDouble(
+                R_Y,
+                mob.getY()
+        );
+
+        entry.putDouble(
+                R_Z,
+                mob.getZ()
+        );
+
+        entry.putString(
+                R_STATE,
+                state
+        );
+
+        return entry;
     }
 
-    public static boolean tryReleaseEgg(
+    private static void updateRosterFromEntity(
             Player player,
-            ItemStack stack
+            Mob mob
     ) {
 
-        if (!stack.is(
-                ModItems.CREW_EGG.get()
-        )) {
-
-            return false;
-        }
-
-        CompoundTag root =
-                stack.getTag();
-
-        if (
-                root == null
-                        || !root.contains(
-                        "CrewData"
-                )
-        ) {
-
-            return false;
-        }
-
-        CompoundTag data =
-                root.getCompound(
-                        "CrewData"
+        ListTag roster =
+                getRoster(
+                        player.getPersistentData()
                 );
 
-        if (
-                !data.hasUUID(OWNER)
-                        || !player.getUUID()
-                        .equals(
-                                data.getUUID(
-                                        OWNER
+        removeRosterEntry(
+                roster,
+                mob.getUUID()
+        );
+
+        roster.add(
+                createRosterEntry(
+                        mob,
+                        mob.getPersistentData()
+                                .getString(
+                                        STATE
                                 )
-                        )
-        ) {
-
-            msg(
-                    player,
-                    "Bu egg senin tayfana ait değil.",
-                    ChatFormatting.RED
-            );
-
-            return true;
-        }
-
-        if (!(player.level()
-                instanceof ServerLevel level)) {
-
-            return true;
-        }
-
-        ResourceLocation id =
-                ResourceLocation.tryParse(
-                        data.getString(
-                                "EntityType"
-                        )
-                );
-
-        if (id == null) {
-            return true;
-        }
-
-        Mob mob =
-                BuiltInRegistries.ENTITY_TYPE
-                        .getOptional(id)
-                        .map(
-                                type ->
-                                        type.create(
-                                                level
-                                        )
-                        )
-                        .filter(
-                                Mob.class::isInstance
-                        )
-                        .map(
-                                Mob.class::cast
-                        )
-                        .orElse(null);
-
-        if (mob == null) {
-            return true;
-        }
-
-        mob.moveTo(
-                player.getX() + 1.0D,
-                player.getY(),
-                player.getZ() + 1.0D,
-                player.getYRot(),
-                player.getXRot()
+                )
         );
-
-        mob.getPersistentData()
-                .putUUID(
-                        OWNER,
-                        player.getUUID()
-                );
-
-        mob.getPersistentData()
-                .putBoolean(
-                        RECRUITED,
-                        true
-                );
-
-        mob.getPersistentData()
-                .putString(
-                        STATE,
-                        "follow"
-                );
-
-        clearCombatData(
-                mob
-        );
-
-        /*
-         * Egg içindeki gerçek adı geri al.
-         */
-        String originalName =
-                data.getString(
-                        "OriginalName"
-                );
-
-        if (originalName.isBlank()) {
-
-            originalName =
-                    mob.getName()
-                            .getString();
-        }
-
-        mob.getPersistentData()
-                .putString(
-                        ORIGINAL_NAME,
-                        originalName
-                );
-
-        /*
-         * Crew isim etiketini yeniden oluştur.
-         */
-        updateCrewNameTag(
-                mob,
-                player
-        );
-
-        mob.setPersistenceRequired();
-
-        mob.setTarget(null);
-
-        level.addFreshEntity(
-                mob
-        );
-
-        if (
-                !player.getAbilities()
-                        .instabuild
-        ) {
-
-            stack.shrink(
-                    1
-            );
-        }
-
-        msg(
-                player,
-                "Tayfa üyesi geri çağrıldı.",
-                ChatFormatting.GREEN
-        );
-
-        return true;
     }
 
-    @SubscribeEvent
-    public static void onRightClickBlock(
-            PlayerInteractEvent.RightClickBlock event
+    private static void removeRosterEntry(
+            ListTag roster,
+            UUID uuid
     ) {
 
-        if (
-                event.getEntity()
-                        .level()
-                        .isClientSide
+        for (
+                int i = roster.size() - 1;
+                i >= 0;
+                i--
         ) {
 
-            return;
-        }
+            CompoundTag entry =
+                    roster.getCompound(
+                            i
+                    );
 
-        if (
-                !event.getItemStack()
-                        .is(
-                                ModItems.CREW_EGG.get()
-                        )
-        ) {
+            if (
+                    entry.hasUUID(R_UUID)
+                            && entry.getUUID(
+                            R_UUID
+                    ).equals(uuid)
+            ) {
 
-            return;
-        }
-
-        if (
-                tryReleaseEgg(
-                        event.getEntity(),
-                        event.getItemStack()
-                )
-        ) {
-
-            event.setCancellationResult(
-                    InteractionResult.SUCCESS
-            );
-
-            event.setCanceled(true);
+                roster.remove(i);
+            }
         }
     }
 
     // =========================================================
-    // CREW LİSTESİ
+    // UZAKTAN ENTITY BUL
+    // =========================================================
+
+    private static Mob findRecruit(
+            MinecraftServer server,
+            ServerPlayer captain,
+            RosterEntry entry
+    ) {
+
+        /*
+         * Önce kayıtlı boyutu bul.
+         */
+        ServerLevel level =
+                server.getLevel(
+                        entry.dimension()
+                );
+
+        if (level == null) {
+            return null;
+        }
+
+        /*
+         * Entity zaten yüklüyse direkt bul.
+         */
+        Entity loaded =
+                level.getEntity(
+                        entry.uuid()
+                );
+
+        if (
+                loaded instanceof Mob mob
+                        && isOwnedBy(
+                        mob,
+                        captain
+                )
+        ) {
+
+            return mob;
+        }
+
+        /*
+         * Entity'nin bulunduğu chunk'ı yükle.
+         */
+        int chunkX =
+                ((int)Math.floor(entry.x()))
+                        >> 4;
+
+        int chunkZ =
+                ((int)Math.floor(entry.z()))
+                        >> 4;
+
+        try {
+
+            level.getChunk(
+                    chunkX,
+                    chunkZ
+            );
+
+        } catch (Exception ignored) {
+            return null;
+        }
+
+        Entity found =
+                level.getEntity(
+                        entry.uuid()
+                );
+
+        if (
+                found instanceof Mob mob
+                        && isOwnedBy(
+                        mob,
+                        captain
+                )
+        ) {
+
+            return mob;
+        }
+
+        /*
+         * Bazı entity sistemlerinde chunk yüklenmiş olsa
+         * bile entity hemen bulunamayabilir.
+         *
+         * Yakın alanı son bir kez tarıyoruz.
+         */
+        List<Mob> nearby =
+                level.getEntitiesOfClass(
+                        Mob.class,
+                        new net.minecraft.world.phys.AABB(
+                                entry.x() - 8.0D,
+                                entry.y() - 8.0D,
+                                entry.z() - 8.0D,
+                                entry.x() + 8.0D,
+                                entry.y() + 8.0D,
+                                entry.z() + 8.0D
+                        ),
+                        mob ->
+                                mob.getUUID()
+                                        .equals(
+                                                entry.uuid()
+                                        )
+                                        && isOwnedBy(
+                                        mob,
+                                        captain
+                                )
+                );
+
+        return nearby.isEmpty()
+                ? null
+                : nearby.get(0);
+    }
+
+    private static List<Mob> getLoadedCrewMembers(
+            ServerPlayer captain
+    ) {
+
+        List<Mob> result =
+                new ArrayList<>();
+
+        for (
+                RosterEntry entry :
+                readRoster(captain)
+        ) {
+
+            ServerLevel level =
+                    captain.getServer()
+                            .getLevel(
+                                    entry.dimension()
+                            );
+
+            if (level == null) {
+                continue;
+            }
+
+            Entity entity =
+                    level.getEntity(
+                            entry.uuid()
+                    );
+
+            if (
+                    entity instanceof Mob mob
+                            && isOwnedBy(
+                            mob,
+                            captain
+                    )
+            ) {
+
+                result.add(
+                        mob
+                );
+            }
+        }
+
+        return result;
+    }
+
+    // =========================================================
+    // K MENÜSÜ İÇİN TÜM ÜYELER
     // =========================================================
 
     public static void sendCrewMembers(
@@ -1463,41 +1952,35 @@ public final class CrewEvents {
                 > list =
                 new ArrayList<>();
 
-        List<Mob> mobs =
-                player.level()
-                        .getEntitiesOfClass(
-                                Mob.class,
-                                player.getBoundingBox()
-                                        .inflate(
-                                                128.0D
-                                        ),
-                                mob ->
-                                        isOwnedBy(
-                                                mob,
-                                                player
-                                        )
-                        );
+        List<RosterEntry> roster =
+                readRoster(
+                        player
+                );
 
+        /*
+         * Liste artık mesafeye bağlı değil.
+         */
         for (
-                Mob mob :
-                mobs
+                RosterEntry entry :
+                roster
         ) {
 
             String state =
-                    mob.getPersistentData()
-                            .getString(
-                                    STATE
-                            );
+                    entry.state();
 
-            if (state.isBlank()) {
-                state = "stop";
+            if (
+                    state == null
+                            || state.isBlank()
+            ) {
+
+                state =
+                        "stop";
             }
 
             list.add(
                     new com.mkai.universalcrew.network.CrewMembersPacket.MemberData(
-                            mob.getUUID(),
-                            mob.getName()
-                                    .getString(),
+                            entry.uuid(),
+                            entry.name(),
                             state
                     )
             );
@@ -1509,6 +1992,59 @@ public final class CrewEvents {
 
                 break;
             }
+        }
+
+        /*
+         * Aktif entity varsa gerçek state'i kullan.
+         */
+        for (
+                int i = 0;
+                i < list.size();
+                i++
+        ) {
+
+            var packetMember =
+                    list.get(i);
+
+            RosterEntry entry =
+                    findRosterEntry(
+                            roster,
+                            packetMember.id()
+                    );
+
+            if (entry == null) {
+                continue;
+            }
+
+            Mob mob =
+                    findRecruit(
+                            player.getServer(),
+                            player,
+                            entry
+                    );
+
+            if (mob == null) {
+                continue;
+            }
+
+            String actualState =
+                    mob.getPersistentData()
+                            .getString(
+                                    STATE
+                            );
+
+            if (actualState.isBlank()) {
+                actualState = "stop";
+            }
+
+            list.set(
+                    i,
+                    new com.mkai.universalcrew.network.CrewMembersPacket.MemberData(
+                            mob.getUUID(),
+                            entry.name(),
+                            actualState
+                    )
+            );
         }
 
         com.mkai.universalcrew.network.ModNetwork.CHANNEL.send(
@@ -1526,103 +2062,26 @@ public final class CrewEvents {
         );
     }
 
-    // =========================================================
-    // CREW DAĞIT
-    // =========================================================
-
-    public static void disbandCrew(
-            ServerPlayer captain
+    private static RosterEntry findRosterEntry(
+            List<RosterEntry> roster,
+            UUID uuid
     ) {
 
-        if (!hasCrew(captain)) {
-            return;
-        }
-
-        List<Mob> mobs =
-                captain.level()
-                        .getEntitiesOfClass(
-                                Mob.class,
-                                captain.getBoundingBox()
-                                        .inflate(
-                                                128.0D
-                                        ),
-                                mob ->
-                                        isOwnedBy(
-                                                mob,
-                                                captain
-                                        )
-                        );
-
         for (
-                Mob mob :
-                mobs
+                RosterEntry entry :
+                roster
         ) {
 
-            mob.getPersistentData()
-                    .remove(
-                            OWNER
-                    );
+            if (
+                    entry.uuid()
+                            .equals(uuid)
+            ) {
 
-            mob.getPersistentData()
-                    .remove(
-                            RECRUITED
-                    );
-
-            mob.getPersistentData()
-                    .remove(
-                            ORIGINAL_NAME
-                    );
-
-            clearCombatData(
-                    mob
-            );
-
-            mob.getPersistentData()
-                    .remove(
-                            DEFEND_POS_SET
-                    );
-
-            mob.setCustomName(
-                    null
-            );
-
-            mob.setCustomNameVisible(
-                    false
-            );
-
-            mob.setTarget(null);
+                return entry;
+            }
         }
 
-        CompoundTag data =
-                captain.getPersistentData();
-
-        data.putBoolean(
-                CREW_EXISTS,
-                false
-        );
-
-        data.remove(
-                CREW_NAME
-        );
-
-        data.remove(
-                CREW_LOGO
-        );
-
-        data.putInt(
-                CREW_COUNT,
-                0
-        );
-
-        msg(
-                captain,
-                "☠ Tayfan dağıtıldı.",
-                ChatFormatting.RED
-        );
-
-        sendCrewMembers(
-                captain
-        );
+        return null;
     }
 
     // =========================================================
@@ -1661,28 +2120,39 @@ public final class CrewEvents {
                         ids
                 );
 
-        List<Mob> selected =
-                captain.level()
-                        .getEntitiesOfClass(
-                                Mob.class,
-                                captain.getBoundingBox()
-                                        .inflate(
-                                                128.0D
-                                        ),
-                                candidate ->
-                                        requested.contains(
-                                                candidate.getUUID()
-                                        )
-                                                && isOwnedBy(
-                                                candidate,
-                                                captain
-                                        )
-                        );
-
+        /*
+         * Artık yakınlık kontrolü yok.
+         * Roster üzerinden üyeleri buluyoruz.
+         */
         for (
-                Mob mob :
-                selected
+                RosterEntry entry :
+                readRoster(captain)
         ) {
+
+            if (
+                    !requested.contains(
+                            entry.uuid()
+                    )
+            ) {
+
+                continue;
+            }
+
+            Mob mob =
+                    findRecruit(
+                            captain.getServer(),
+                            captain,
+                            entry
+                    );
+
+            /*
+             * Entity gerçekten bulunamazsa bile roster'da
+             * kalmaya devam eder.
+             */
+            if (mob == null) {
+
+                continue;
+            }
 
             switch (command) {
 
@@ -1711,9 +2181,10 @@ public final class CrewEvents {
                     mob.getNavigation()
                             .stop();
 
-                    updateCrewNameTag(
+                    updateRosterState(
+                            captain,
                             mob,
-                            captain
+                            "follow"
                     );
                 }
 
@@ -1742,9 +2213,10 @@ public final class CrewEvents {
                         mob.stopRiding();
                     }
 
-                    updateCrewNameTag(
+                    updateRosterState(
+                            captain,
                             mob,
-                            captain
+                            "stop"
                     );
                 }
 
@@ -1760,9 +2232,6 @@ public final class CrewEvents {
                                     "defend"
                             );
 
-                    /*
-                     * Savunma başlangıç noktası.
-                     */
                     mob.getPersistentData()
                             .putDouble(
                                     DEFEND_X,
@@ -1796,9 +2265,10 @@ public final class CrewEvents {
                     mob.getNavigation()
                             .stop();
 
-                    updateCrewNameTag(
+                    updateRosterState(
+                            captain,
                             mob,
-                            captain
+                            "defend"
                     );
                 }
 
@@ -1808,25 +2278,20 @@ public final class CrewEvents {
 
                 case "attack" -> {
 
-                    /*
-                     * Her durumda ATAK moduna geç.
-                     */
                     mob.getPersistentData()
                             .putString(
                                     STATE,
                                     "attack"
                             );
 
-                    /*
-                     * Eski savunma hedefini kaldır.
-                     */
                     mob.getPersistentData()
                             .remove(
                                     DEFEND_TARGET
                             );
 
                     /*
-                     * Kaptanın mevcut düşmanını bul.
+                     * ATAK komutu verildiğinde hedef
+                     * olmasa bile state attack.
                      */
                     LivingEntity target =
                             findCaptainCurrentTarget(
@@ -1851,9 +2316,6 @@ public final class CrewEvents {
 
                     } else {
 
-                        /*
-                         * Hedef yoksa yine ATAK modunda.
-                         */
                         mob.getPersistentData()
                                 .remove(
                                         COMBAT_TARGET
@@ -1862,9 +2324,10 @@ public final class CrewEvents {
                         mob.setTarget(null);
                     }
 
-                    updateCrewNameTag(
+                    updateRosterState(
+                            captain,
                             mob,
-                            captain
+                            "attack"
                     );
                 }
             }
@@ -1876,7 +2339,80 @@ public final class CrewEvents {
     }
 
     // =========================================================
-    // KAPTANIN MEVCUT HEDEFİ
+    // KOMUT DURUMU GÜNCELLE
+    // =========================================================
+
+    private static void updateRosterState(
+            ServerPlayer captain,
+            Mob mob,
+            String state
+    ) {
+
+        ListTag roster =
+                getRoster(
+                        captain.getPersistentData()
+                );
+
+        for (
+                int i = 0;
+                i < roster.size();
+                i++
+        ) {
+
+            CompoundTag entry =
+                    roster.getCompound(
+                            i
+                    );
+
+            if (
+                    entry.hasUUID(R_UUID)
+                            && entry.getUUID(
+                            R_UUID
+                    ).equals(
+                            mob.getUUID()
+                    )
+            ) {
+
+                entry.putString(
+                        R_STATE,
+                        state
+                );
+
+                entry.putDouble(
+                        R_X,
+                        mob.getX()
+                );
+
+                entry.putDouble(
+                        R_Y,
+                        mob.getY()
+                );
+
+                entry.putDouble(
+                        R_Z,
+                        mob.getZ()
+                );
+
+                entry.putString(
+                        R_DIMENSION,
+                        mob.level()
+                                .dimension()
+                                .location()
+                                .toString()
+                );
+
+                roster.set(
+                        i,
+                        entry
+                );
+
+                return;
+            }
+        }
+    }
+
+    // =========================================================
+    // ATAK HEDEFİ
     // =========================================================
 
     private static LivingEntity findCaptainCurrentTarget(
@@ -1884,65 +2420,126 @@ public final class CrewEvents {
             Mob member
     ) {
 
-        /*
-         * Önce kaptanın vurduğu canlı.
-         */
         LivingEntity target =
                 captain.getLastHurtMob();
 
         if (
-                target != null
-                        && target.isAlive()
-                        && target != captain
-                        && target != member
-                        && !isSameCrew(
+                isValidCombatTarget(
+                        captain,
                         member,
                         target
                 )
         ) {
 
-            if (
-                    target.level()
-                            == captain.level()
-                            && target.distanceTo(
-                            captain
-                    ) <= TARGET_MAX_DISTANCE
-            ) {
-
-                return target;
-            }
+            return target;
         }
 
-        /*
-         * Sonra kaptana saldıran canlı.
-         */
         target =
                 captain.getLastHurtByMob();
 
         if (
-                target != null
-                        && target.isAlive()
-                        && target != captain
-                        && target != member
-                        && !isSameCrew(
+                isValidCombatTarget(
+                        captain,
                         member,
                         target
                 )
         ) {
 
-            if (
-                    target.level()
-                            == captain.level()
-                            && target.distanceTo(
-                            captain
-                    ) <= TARGET_MAX_DISTANCE
-            ) {
-
-                return target;
-            }
+            return target;
         }
 
         return null;
+    }
+
+    private static boolean isValidCombatTarget(
+            ServerPlayer captain,
+            Mob member,
+            LivingEntity target
+    ) {
+
+        if (
+                target == null
+                        || !target.isAlive()
+        ) {
+
+            return false;
+        }
+
+        if (
+                target == captain
+                        || target == member
+        ) {
+
+            return false;
+        }
+
+        if (
+                isSameCrew(
+                        member,
+                        target
+                )
+        ) {
+
+            return false;
+        }
+
+        if (
+                target.level()
+                        != captain.level()
+        ) {
+
+            return false;
+        }
+
+        return target.distanceTo(
+                captain
+        ) <= TARGET_MAX_DISTANCE;
+    }
+
+    private static void setCombatTarget(
+            Mob mob,
+            LivingEntity target
+    ) {
+
+        if (
+                target == null
+                        || !target.isAlive()
+                        || isSameCrew(
+                        mob,
+                        target
+                )
+        ) {
+
+            return;
+        }
+
+        mob.getPersistentData()
+                .putUUID(
+                        COMBAT_TARGET,
+                        target.getUUID()
+                );
+
+        mob.getPersistentData()
+                .remove(
+                        DEFEND_TARGET
+                );
+
+        mob.setTarget(
+                target
+        );
+
+        if (
+                mob.distanceTo(
+                        target
+                ) > 3.0D
+        ) {
+
+            mob.getNavigation()
+                    .moveTo(
+                            target,
+                            1.15D
+                    );
+        }
     }
 
     // =========================================================
@@ -1968,15 +2565,16 @@ public final class CrewEvents {
             return;
         }
 
+        if (!(mob.level()
+                instanceof ServerLevel level)) {
+
+            return;
+        }
+
         UUID ownerId =
                 readOwner(mob);
 
-        if (
-                ownerId == null
-                        || !(mob.level()
-                        instanceof ServerLevel level)
-        ) {
-
+        if (ownerId == null) {
             return;
         }
 
@@ -1987,24 +2585,27 @@ public final class CrewEvents {
                                 ownerId
                         );
 
-        if (
-                owner == null
-                        || owner.level() != level
-        ) {
-
-            mob.getNavigation()
-                    .stop();
-
-            mob.setTarget(null);
-
+        if (owner == null) {
             return;
         }
 
         /*
-         * Her tick ismin doğru olduğundan emin ol.
-         *
-         * Bu sayede crew adı değiştirilmişse bile
-         * aktif üyelerin etiketi güncellenebilir.
+         * Roster konumunu belirli aralıklarla güncelle.
+         */
+        if (
+                mob.tickCount
+                        % ROSTER_UPDATE_INTERVAL
+                        == 0
+        ) {
+
+            updateRosterFromEntity(
+                    owner,
+                    mob
+            );
+        }
+
+        /*
+         * Tayfa adı etiketi.
          */
         updateCrewNameTag(
                 mob,
@@ -2035,6 +2636,12 @@ public final class CrewEvents {
                     mob
             );
 
+            updateRosterState(
+                    owner,
+                    mob,
+                    "stop"
+            );
+
             return;
         }
 
@@ -2054,11 +2661,29 @@ public final class CrewEvents {
                 mob.stopRiding();
             }
 
+            /*
+             * FARKLI BOYUT
+             */
+            if (mob.level()
+                    != owner.level()
+            ) {
+
+                teleportRecruitToOwner(
+                        mob,
+                        owner
+                );
+
+                return;
+            }
+
             double distance =
                     mob.distanceTo(
                             owner
                     );
 
+            /*
+             * Çok uzaksa ışınlan.
+             */
             if (
                     distance
                             > TELEPORT_DISTANCE
@@ -2076,6 +2701,9 @@ public final class CrewEvents {
                 return;
             }
 
+            /*
+             * Yakınsa yürü.
+             */
             if (
                     distance
                             > FOLLOW_DISTANCE
@@ -2113,9 +2741,6 @@ public final class CrewEvents {
                             defendId
                     );
 
-            /*
-             * Gerçek tehdit varsa ona saldır.
-             */
             if (
                     attacker != null
                             && attacker.isAlive()
@@ -2144,9 +2769,6 @@ public final class CrewEvents {
                 return;
             }
 
-            /*
-             * Tehdit yok.
-             */
             mob.getPersistentData()
                     .remove(
                             DEFEND_TARGET
@@ -2155,7 +2777,7 @@ public final class CrewEvents {
             mob.setTarget(null);
 
             /*
-             * SAVUN noktasına dön.
+             * Savunma noktasına dön.
              */
             if (
                     mob.getPersistentData()
@@ -2230,8 +2852,7 @@ public final class CrewEvents {
                     );
 
             /*
-             * ATAK modundaki üyeye birisi saldırdıysa
-             * önce onu savun.
+             * Önce tayfa arkadaşına saldıranı savun.
              */
             LivingEntity defendTarget =
                     findLivingEntity(
@@ -2287,7 +2908,7 @@ public final class CrewEvents {
             }
 
             /*
-             * ANA ATAK HEDEFİ.
+             * Ana hedef.
              */
             LivingEntity combatTarget =
                     findLivingEntity(
@@ -2305,12 +2926,9 @@ public final class CrewEvents {
                     )
             ) {
 
-                /*
-                 * Hedefi mobun kendi AI'sına ver.
-                 */
                 if (
-                        mob.getTarget() == null
-                                || mob.getTarget() != combatTarget
+                        mob.getTarget()
+                                != combatTarget
                 ) {
 
                     mob.setTarget(
@@ -2319,7 +2937,7 @@ public final class CrewEvents {
                 }
 
                 /*
-                 * Hedefe yaklaş.
+                 * Hedefe hareket.
                  */
                 if (
                         mob.distanceTo(
@@ -2334,21 +2952,9 @@ public final class CrewEvents {
                             );
                 }
 
-                /*
-                 * BURADA SALDIRI ÇAĞRISI YOK.
-                 *
-                 * Luffy/Zoro/başka mod hangi combat
-                 * sistemini kullanıyorsa o devam ediyor.
-                 */
                 return;
             }
 
-            /*
-             * Hedef yok.
-             *
-             * ATAK modu açık kalıyor ama kaptanın
-             * peşine dönüyor.
-             */
             if (combatId != null) {
 
                 mob.getPersistentData()
@@ -2359,8 +2965,25 @@ public final class CrewEvents {
 
             mob.setTarget(null);
 
+            /*
+             * ATAK + hedef yok:
+             * kaptanı takip et.
+             */
+
             if (mob.isPassenger()) {
                 mob.stopRiding();
+            }
+
+            if (mob.level()
+                    != owner.level()
+            ) {
+
+                teleportRecruitToOwner(
+                        mob,
+                        owner
+                );
+
+                return;
             }
 
             double distance =
@@ -2405,10 +3028,9 @@ public final class CrewEvents {
             return;
         }
 
-        // =====================================================
-        // BİLİNMEYEN STATE
-        // =====================================================
-
+        /*
+         * Bilinmeyen state.
+         */
         mob.getPersistentData()
                 .putString(
                         STATE,
@@ -2420,6 +3042,40 @@ public final class CrewEvents {
         );
 
         mob.setTarget(null);
+    }
+
+    // =========================================================
+    // FARKLI BOYUTA TAYFA ÜYESİ TAŞI
+    // =========================================================
+
+    private static void teleportRecruitToOwner(
+            Mob mob,
+            ServerPlayer owner
+    ) {
+
+        /*
+         * Entity transferi.
+         *
+         * Forge/MC tarafında farklı dimension'a
+         * geçerken entity'nin Level'ını değiştirmek
+         * doğrudan mümkün olmadığından yeni entity
+         * oluşturmak istemiyoruz.
+         *
+         * Öncelikle vanilla teleportTo(ServerLevel,...)
+         * API'sini deniyoruz.
+         */
+        mob.teleportTo(
+                owner.getServerLevel(),
+                owner.getX(),
+                owner.getY(),
+                owner.getZ(),
+                Set.of(),
+                owner.getYRot(),
+                owner.getXRot()
+        );
+
+        mob.getNavigation()
+                .stop();
     }
 
     // =========================================================
@@ -2448,149 +3104,6 @@ public final class CrewEvents {
         }
 
         return null;
-    }
-
-    // =========================================================
-    // TARGET AYARLA
-    // =========================================================
-
-    private static void setCombatTarget(
-            Mob mob,
-            LivingEntity target
-    ) {
-
-        if (
-                target == null
-                        || !target.isAlive()
-                        || isSameCrew(
-                        mob,
-                        target
-                )
-        ) {
-
-            return;
-        }
-
-        mob.getPersistentData()
-                .putUUID(
-                        COMBAT_TARGET,
-                        target.getUUID()
-                );
-
-        mob.getPersistentData()
-                .remove(
-                        DEFEND_TARGET
-                );
-
-        mob.setTarget(
-                target
-        );
-
-        if (
-                mob.distanceTo(
-                        target
-                ) > 3.0D
-        ) {
-
-            mob.getNavigation()
-                    .moveTo(
-                            target,
-                            1.15D
-                    );
-        }
-    }
-
-    // =========================================================
-    // TAYFA İSMİ
-    // =========================================================
-
-    private static void updateCrewNameTag(
-        Mob mob,
-        Player captain
-) {
-
-        String crewName =
-                captain.getPersistentData()
-                        .getString(
-                                CREW_NAME
-                        );
-
-        if (crewName == null
-                || crewName.isBlank()) {
-
-            return;
-        }
-
-        String originalName =
-                mob.getPersistentData()
-                        .getString(
-                                ORIGINAL_NAME
-                        );
-
-        /*
-         * Eski save'lerde ORIGINAL_NAME yoksa
-         * mobun mevcut adından al.
-         */
-        if (originalName.isBlank()) {
-
-            originalName =
-                    mob.getName()
-                            .getString();
-
-            /*
-             * Eğer eski formatlı crew adı varsa,
-             * tekrar üst üste yazılmasını engelle.
-             */
-            if (
-                    originalName.startsWith("<")
-                            && originalName.contains(">[")
-            ) {
-
-                int bracket =
-                        originalName.indexOf(">[");
-                
-                if (bracket >= 0) {
-
-                    String clean =
-                            originalName.substring(
-                                    bracket + 2
-                            );
-
-                    if (
-                            clean.endsWith("]")
-                    ) {
-
-                        clean =
-                                clean.substring(
-                                        0,
-                                        clean.length() - 1
-                                );
-                    }
-
-                    originalName = clean;
-                }
-            }
-
-            mob.getPersistentData()
-                    .putString(
-                            ORIGINAL_NAME,
-                            originalName
-                    );
-        }
-
-        mob.setCustomName(
-                Component.literal(
-                        "<"
-                                + crewName
-                                + "> ["
-                                + originalName
-                                + "]"
-                )
-        );
-
-        mob.setCustomNameVisible(
-                true
-        );
     }
 
     // =========================================================
@@ -2639,37 +3152,176 @@ public final class CrewEvents {
     }
 
     // =========================================================
-    // SAYILAR
+    // CREW DAĞIT
     // =========================================================
 
-    private static void incrementCrewCount(
-            Player player,
-            int delta
+    public static void disbandCrew(
+            ServerPlayer captain
     ) {
 
+        if (!hasCrew(captain)) {
+            return;
+        }
+
+        /*
+         * Roster'daki bütün üyeleri bul.
+         */
+        List<RosterEntry> roster =
+                readRoster(
+                        captain
+                );
+
+        for (
+                RosterEntry entry :
+                roster
+        ) {
+
+            Mob mob =
+                    findRecruit(
+                            captain.getServer(),
+                            captain,
+                            entry
+                    );
+
+            if (mob == null) {
+                continue;
+            }
+
+            mob.getPersistentData()
+                    .remove(
+                            OWNER
+                    );
+
+            mob.getPersistentData()
+                    .remove(
+                            RECRUITED
+                    );
+
+            mob.getPersistentData()
+                    .remove(
+                            ORIGINAL_NAME
+                    );
+
+            clearCombatData(
+                    mob
+            );
+
+            mob.getPersistentData()
+                    .remove(
+                            DEFEND_POS_SET
+                    );
+
+            mob.setCustomName(
+                    null
+            );
+
+            mob.setCustomNameVisible(
+                    false
+            );
+
+            mob.setTarget(null);
+        }
+
         CompoundTag data =
-                player.getPersistentData();
+                captain.getPersistentData();
+
+        data.putBoolean(
+                CREW_EXISTS,
+                false
+        );
+
+        data.remove(
+                CREW_NAME
+        );
+
+        data.remove(
+                CREW_LOGO
+        );
 
         data.putInt(
                 CREW_COUNT,
-                Math.max(
-                        0,
-                        data.getInt(
-                                CREW_COUNT
-                        )
-                                + delta
-                )
+                0
+        );
+
+        data.remove(
+                ROSTER
+        );
+
+        msg(
+                captain,
+                "☠ Tayfan dağıtıldı.",
+                ChatFormatting.RED
+        );
+
+        sendCrewMembers(
+                captain
         );
     }
 
-    public static int countCrew(
-            Player player
+    // =========================================================
+    // ÖLÜM
+    // =========================================================
+
+    @SubscribeEvent
+    public static void onRecruitDeath(
+            LivingDeathEvent event
     ) {
 
-        return player
-                .getPersistentData()
-                .getInt(
-                        CREW_COUNT
+        if (!(event.getEntity()
+                instanceof Mob mob)) {
+
+            return;
+        }
+
+        if (!isOwned(mob)) {
+            return;
+        }
+
+        UUID ownerId =
+                readOwner(
+                        mob
+                );
+
+        if (ownerId == null) {
+            return;
+        }
+
+        MinecraftServer server =
+                mob.getServer();
+
+        if (server == null) {
+            return;
+        }
+
+        ServerPlayer owner =
+                server.getPlayerList()
+                        .getPlayer(
+                                ownerId
+                        );
+
+        if (owner == null) {
+            return;
+        }
+
+        incrementCrewCount(
+                owner,
+                -1
+        );
+
+        ListTag roster =
+                getRoster(
+                        owner.getPersistentData()
+                );
+
+        removeRosterEntry(
+                roster,
+                mob.getUUID()
+        );
+
+        owner.getPersistentData()
+                .put(
+                        ROSTER,
+                        roster
                 );
     }
 
@@ -2702,12 +3354,12 @@ public final class CrewEvents {
                 entity
         )
                 && player
-                .getUUID()
-                .equals(
-                        readOwner(
-                                entity
-                        )
-                );
+                        .getUUID()
+                        .equals(
+                                readOwner(
+                                        entity
+                                )
+                        );
     }
 
     private static UUID readOwner(
@@ -2725,6 +3377,59 @@ public final class CrewEvents {
                         OWNER
                         )
                 : null;
+    }
+
+    // =========================================================
+    // SAYI
+    // =========================================================
+
+    private static void incrementCrewCount(
+            Player player,
+            int delta
+    ) {
+
+        CompoundTag data =
+                player.getPersistentData();
+
+        data.putInt(
+                CREW_COUNT,
+                Math.max(
+                        0,
+                        data.getInt(
+                                CREW_COUNT
+                        ) + delta
+                )
+        );
+    }
+
+    public static int countCrew(
+            Player player
+    ) {
+
+        return player
+                .getPersistentData()
+                .getInt(
+                        CREW_COUNT
+                );
+    }
+
+    // =========================================================
+    // COMBAT DATA
+    // =========================================================
+
+    private static void clearCombatData(
+            Mob mob
+    ) {
+
+        mob.getPersistentData()
+                .remove(
+                        COMBAT_TARGET
+                );
+
+        mob.getPersistentData()
+                .remove(
+                        DEFEND_TARGET
+                );
     }
 
     private static UUID readCombatTarget(
@@ -2759,75 +3464,6 @@ public final class CrewEvents {
                         DEFEND_TARGET
                         )
                 : null;
-    }
-
-    // =========================================================
-    // COMBAT TEMİZLE
-    // =========================================================
-
-    private static void clearCombatData(
-            Mob mob
-    ) {
-
-        mob.getPersistentData()
-                .remove(
-                        COMBAT_TARGET
-                );
-
-        mob.getPersistentData()
-                .remove(
-                        DEFEND_TARGET
-                );
-    }
-
-    // =========================================================
-    // ÖLÜM
-    // =========================================================
-
-    @SubscribeEvent
-    public static void onRecruitDeath(
-            LivingDeathEvent event
-    ) {
-
-        if (
-                !(event.getEntity()
-                        instanceof Mob mob)
-                        || !isOwned(mob)
-                        || mob.level().isClientSide
-        ) {
-
-            return;
-        }
-
-        UUID ownerId =
-                readOwner(
-                        mob
-                );
-
-        if (
-                ownerId == null
-                        || mob.level()
-                        .getServer() == null
-        ) {
-
-            return;
-        }
-
-        ServerPlayer owner =
-                mob.level()
-                        .getServer()
-                        .getPlayerList()
-                        .getPlayer(
-                                ownerId
-                        );
-
-        if (owner != null) {
-
-            incrementCrewCount(
-                    owner,
-                    -1
-            );
-        }
     }
 
     // =========================================================
