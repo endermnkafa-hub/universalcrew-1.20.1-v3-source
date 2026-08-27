@@ -3072,32 +3072,7 @@ public final class CrewEvents {
     );
 
     mob.getNavigation().stop();
-} {
-
-        /*
-         * Entity transferi.
-         *
-         * Forge/MC tarafında farklı dimension'a
-         * geçerken entity'nin Level'ını değiştirmek
-         * doğrudan mümkün olmadığından yeni entity
-         * oluşturmak istemiyoruz.
-         *
-         * Öncelikle vanilla teleportTo(ServerLevel,...)
-         * API'sini deniyoruz.
-         */
-        mob.teleportTo(
-                owner.getServerLevel(),
-                owner.getX(),
-                owner.getY(),
-                owner.getZ(),
-                Set.of(),
-                owner.getYRot(),
-                owner.getXRot()
-        );
-
-        mob.getNavigation()
-                .stop();
-    }
+} 
 
     // =========================================================
     // ENTITY BUL
