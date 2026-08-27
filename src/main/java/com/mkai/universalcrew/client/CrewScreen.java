@@ -178,240 +178,280 @@ public class CrewScreen extends Screen {
 
     private void buildManagementScreen() {
 
-        int center =
-                this.width / 2;
+    int center =
+            this.width / 2;
+
+    // =====================================================
+    // DAVET
+    // =====================================================
+
+    addRenderableWidget(
+            Button.builder(
+                    Component.literal(
+                            "✉ DAVET EŞYASI"
+                    ),
+                    button ->
+                            giveInvite()
+            )
+            .bounds(
+                    center - 170,
+                    70,
+                    120,
+                    22
+            )
+            .build()
+    );
+
+    // =====================================================
+    // YENİLE
+    // =====================================================
+
+    addRenderableWidget(
+            Button.builder(
+                    Component.literal(
+                            "↻ YENİLE"
+                    ),
+                    button ->
+                            requestMembers()
+            )
+            .bounds(
+                    center - 45,
+                    70,
+                    90,
+                    22
+            )
+            .build()
+    );
+
+    int memberStartY =
+            105;
+
+    // =====================================================
+    // ÜYELER
+    // =====================================================
+
+    for (
+            int i = 0;
+            i < ClientCrewState.members.size();
+            i++
+    ) {
+
+        final int index =
+                i;
 
         addRenderableWidget(
                 Button.builder(
-                        Component.literal(
-                                "✉ DAVET EŞYASI"
-                        ),
+                        memberLabel(i),
                         button ->
-                                giveInvite()
+                                toggleMember(index)
                 )
                 .bounds(
                         center - 170,
-                        70,
-                        120,
-                        22
-                )
-                .build()
-        );
-
-        addRenderableWidget(
-                Button.builder(
-                        Component.literal(
-                                "↻ YENİLE"
-                        ),
-                        button ->
-                                requestMembers()
-                )
-                .bounds(
-                        center - 45,
-                        70,
-                        90,
-                        22
-                )
-                .build()
-        );
-
-        int memberStartY =
-                105;
-
-        for (
-                int i = 0;
-                i < ClientCrewState.members.size();
-                i++
-        ) {
-
-            final int index = i;
-
-            addRenderableWidget(
-                    Button.builder(
-                            memberLabel(i),
-                            button ->
-                                    toggleMember(index)
-                    )
-                    .bounds(
-                            center - 170,
-                            memberStartY
-                                    + i * 26,
-                            340,
-                            22
-                    )
-                    .build()
-            );
-        }
-
-        int bottom =
-                Math.max(
-                        155,
                         memberStartY
-                                + ClientCrewState.members.size()
-                                * 26
-                                + 10
-                );
-
-        // =====================================================
-        // ATAK
-        // =====================================================
-
-        addRenderableWidget(
-                Button.builder(
-                        Component.literal(
-                                "⚔ ATAK"
-                        ),
-                        button ->
-                                sendCommand(
-                                        "attack"
-                                )
-                )
-                .bounds(
-                        center - 170,
-                        bottom,
-                        78,
-                        24
-                )
-                .build()
-        );
-
-        // =====================================================
-        // TAKİP
-        // =====================================================
-
-        addRenderableWidget(
-                Button.builder(
-                        Component.literal(
-                                "➜ TAKİP"
-                        ),
-                        button ->
-                                sendCommand(
-                                        "follow"
-                                )
-                )
-                .bounds(
-                        center - 84,
-                        bottom,
-                        78,
-                        24
-                )
-                .build()
-        );
-
-        // =====================================================
-        // SAVUN
-        // =====================================================
-
-        addRenderableWidget(
-                Button.builder(
-                        Component.literal(
-                                "🛡 SAVUN"
-                        ),
-                        button ->
-                                sendCommand(
-                                        "defend"
-                                )
-                )
-                .bounds(
-                        center + 2,
-                        bottom,
-                        78,
-                        24
-                )
-                .build()
-        );
-
-        // =====================================================
-        // DUR
-        // =====================================================
-
-        addRenderableWidget(
-                Button.builder(
-                        Component.literal(
-                                "■ DUR"
-                        ),
-                        button ->
-                                sendCommand(
-                                        "stop"
-                                )
-                )
-                .bounds(
-                        center + 88,
-                        bottom,
-                        82,
-                        24
-                )
-                .build()
-        );
-
-        // =====================================================
-        // SEÇİM
-        // =====================================================
-
-        addRenderableWidget(
-                Button.builder(
-                        Component.literal(
-                                "TÜMÜNÜ SEÇ"
-                        ),
-                        button ->
-                                selectAll()
-                )
-                .bounds(
-                        center - 170,
-                        bottom + 32,
-                        105,
-                        22
-                )
-                .build()
-        );
-
-        addRenderableWidget(
-                Button.builder(
-                        Component.literal(
-                                "SEÇİMİ TEMİZLE"
-                        ),
-                        button -> {
-
-                            selected.clear();
-
-                            rebuildWidgets();
-                        }
-                )
-                .bounds(
-                        center - 58,
-                        bottom + 32,
-                        110,
-                        22
-                )
-                .build()
-        );
-
-        // =====================================================
-        // TAYFAYI DAĞIT
-        // =====================================================
-
-        addRenderableWidget(
-                Button.builder(
-                        Component.literal(
-                                "☠ TAYFAYI DAĞIT"
-                        ),
-                        button -> {
-
-                            confirmDisband =
-                                    true;
-
-                            rebuildWidgets();
-                        }
-                )
-                .bounds(
-                        center + 60,
-                        bottom + 32,
-                        110,
+                                + i * 26,
+                        340,
                         22
                 )
                 .build()
         );
     }
+
+    int bottom =
+            Math.max(
+                    155,
+                    memberStartY
+                            + ClientCrewState.members.size()
+                            * 26
+                            + 10
+            );
+
+    // =====================================================
+    // ATAK
+    // =====================================================
+
+    addRenderableWidget(
+            Button.builder(
+                    Component.literal(
+                            "⚔ ATAK"
+                    ),
+                    button ->
+                            sendCommand(
+                                    "attack"
+                            )
+            )
+            .bounds(
+                    center - 170,
+                    bottom,
+                    78,
+                    24
+            )
+            .build()
+    );
+
+    // =====================================================
+    // TAKİP
+    // =====================================================
+
+    addRenderableWidget(
+            Button.builder(
+                    Component.literal(
+                            "➜ TAKİP"
+                    ),
+                    button ->
+                            sendCommand(
+                                    "follow"
+                            )
+            )
+            .bounds(
+                    center - 84,
+                    bottom,
+                    78,
+                    24
+            )
+            .build()
+    );
+
+    // =====================================================
+    // SAVUN
+    // =====================================================
+
+    addRenderableWidget(
+            Button.builder(
+                    Component.literal(
+                            "🛡 SAVUN"
+                    ),
+                    button ->
+                            sendCommand(
+                                    "defend"
+                            )
+            )
+            .bounds(
+                    center + 2,
+                    bottom,
+                    78,
+                    24
+            )
+            .build()
+    );
+
+    // =====================================================
+    // DUR
+    // =====================================================
+
+    addRenderableWidget(
+            Button.builder(
+                    Component.literal(
+                            "■ DUR"
+                    ),
+                    button ->
+                            sendCommand(
+                                    "stop"
+                            )
+            )
+            .bounds(
+                    center + 88,
+                    bottom,
+                    82,
+                    24
+            )
+            .build()
+    );
+
+    // =====================================================
+    // TÜMÜNÜ SEÇ
+    // =====================================================
+
+    addRenderableWidget(
+            Button.builder(
+                    Component.literal(
+                            "TÜMÜNÜ SEÇ"
+                    ),
+                    button ->
+                            selectAll()
+            )
+            .bounds(
+                    center - 220,
+                    bottom + 32,
+                    105,
+                    22
+            )
+            .build()
+    );
+
+    // =====================================================
+    // SEÇİMİ TEMİZLE
+    // =====================================================
+
+    addRenderableWidget(
+            Button.builder(
+                    Component.literal(
+                            "SEÇİMİ TEMİZLE"
+                    ),
+                    button -> {
+
+                        selected.clear();
+
+                        rebuildWidgets();
+                    }
+            )
+            .bounds(
+                    center - 108,
+                    bottom + 32,
+                    110,
+                    22
+            )
+            .build()
+    );
+
+    // =====================================================
+    // IŞINLA
+    // =====================================================
+
+    addRenderableWidget(
+            Button.builder(
+                    Component.literal(
+                            "✦ IŞINLA"
+                    ),
+                    button ->
+                            sendCommand(
+                                    "teleport"
+                            )
+            )
+            .bounds(
+                    center + 8,
+                    bottom + 32,
+                    100,
+                    22
+            )
+            .build()
+    );
+
+    // =====================================================
+    // TAYFAYI DAĞIT
+    // =====================================================
+
+    addRenderableWidget(
+            Button.builder(
+                    Component.literal(
+                            "☠ TAYFAYI DAĞIT"
+                    ),
+                    button -> {
+
+                        confirmDisband =
+                                true;
+
+                        rebuildWidgets();
+                    }
+            )
+            .bounds(
+                    center + 115,
+                    bottom + 32,
+                    105,
+                    22
+            )
+            .build()
+    );
+}
 
     // =========================================================
     // ONAY
