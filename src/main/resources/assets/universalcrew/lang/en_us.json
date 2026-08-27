@@ -1,6 +1,11 @@
 {
   "item.universalcrew.crew_invitation": "Crew Invitation",
   "item.universalcrew.crew_egg": "Crew Egg",
+  "key.categories.universalcrew": "Universal Crew",
   "key.universalcrew.crew_menu": "Crew Menu",
-  "key.categories.universalcrew": "Universal Crew"
+  "key.universalcrew.follow": "Crew: Follow",
+  "key.universalcrew.attack": "Crew: Attack",
+  "key.universalcrew.defend": "Crew: Defend",
+  "key.universalcrew.stop": "Crew: Stop",
+  "key.universalcrew.teleport": "Crew: Teleport"
 }
