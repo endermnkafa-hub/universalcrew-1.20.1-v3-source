@@ -174,11 +174,11 @@ public class CrewScreen extends Screen {
                             / ClientCrewState.members.size()
                             * trackHeight)
             );
-            int maxOffset = ClientCrewState.members.size() - visibleRows;
+            int scrollbarMaxOffset = ClientCrewState.members.size() - visibleRows;
             int travel = Math.max(0, trackHeight - thumbHeight);
-            int thumbY = listTop + (maxOffset == 0
+            int thumbY = listTop + (scrollbarMaxOffset == 0
                     ? 0
-                    : (int) ((double) scrollOffset / maxOffset * travel));
+                    : (int) ((double) scrollOffset / scrollbarMaxOffset * travel));
 
             // Scroll bar is drawn in render(). This block only calculates
             // positions by keeping the same layout constants.
