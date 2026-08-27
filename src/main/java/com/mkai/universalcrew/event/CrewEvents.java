@@ -1953,9 +1953,73 @@ public final class CrewEvents {
                 new ArrayList<>();
 
         List<RosterEntry> roster =
-                readRoster(
-                        player
-                );
+                readRoster(player);
+        ListTag rosterTag =
+        getRoster(
+                player.getPersistentData()
+        );
+
+boolean rosterChanged = false;
+
+for (
+        int i = rosterTag.size() - 1;
+        i >= 0;
+        i--
+) {
+
+    CompoundTag entryTag =
+            rosterTag.getCompound(i);
+
+    if (!entryTag.hasUUID(R_UUID)) {
+        rosterTag.remove(i);
+        rosterChanged = true;
+        continue;
+    }
+
+    UUID memberId =
+            entryTag.getUUID(R_UUID);
+
+    RosterEntry entry =
+            findRosterEntry(
+                    roster,
+                    memberId
+            );
+
+    if (entry == null) {
+        rosterTag.remove(i);
+        rosterChanged = true;
+        continue;
+    }
+
+    Mob mob =
+            findRecruit(
+                    player.getServer(),
+                    player,
+                    entry
+            );
+
+    /*
+     * Kayıtlı entity artık yoksa:
+     *
+     * - ölmüş olabilir
+     * - yok olmuş olabilir
+     *
+     * K menüsünde göstermeyelim.
+     */
+    if (mob == null || !mob.isAlive()) {
+
+        rosterTag.remove(i);
+        rosterChanged = true;
+    }
+}
+
+if (rosterChanged) {
+
+    player.getPersistentData().put(
+            ROSTER,
+            rosterTag
+    );
+}
 
         /*
          * Liste artık mesafeye bağlı değil.
