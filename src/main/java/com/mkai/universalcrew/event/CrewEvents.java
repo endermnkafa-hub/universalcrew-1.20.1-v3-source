@@ -3049,9 +3049,30 @@ public final class CrewEvents {
     // =========================================================
 
     private static void teleportRecruitToOwner(
-            Mob mob,
-            ServerPlayer owner
-    ) {
+        Mob mob,
+        ServerPlayer owner
+) {
+
+    if (!(owner.level() instanceof ServerLevel targetLevel)) {
+        return;
+    }
+
+    /*
+     * Recruit'ı kaptanın bulunduğu dimension'a
+     * ve konuma taşı.
+     */
+    mob.teleportTo(
+            targetLevel,
+            owner.getX(),
+            owner.getY(),
+            owner.getZ(),
+            java.util.Set.of(),
+            owner.getYRot(),
+            owner.getXRot()
+    );
+
+    mob.getNavigation().stop();
+} {
 
         /*
          * Entity transferi.
