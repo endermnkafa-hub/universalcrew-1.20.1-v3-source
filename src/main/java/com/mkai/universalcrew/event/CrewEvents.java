@@ -1944,187 +1944,171 @@ public final class CrewEvents {
     // =========================================================
 
     public static void sendCrewMembers(
-            ServerPlayer player
-    ) {
-
-        List<
-                com.mkai.universalcrew.network.CrewMembersPacket.MemberData
-                > list =
-                new ArrayList<>();
-
-        List<RosterEntry> roster =
-                readRoster(player);
-        ListTag rosterTag =
-        getRoster(
-                player.getPersistentData()
-        );
-
-boolean rosterChanged = false;
-
-for (
-        int i = rosterTag.size() - 1;
-        i >= 0;
-        i--
+        ServerPlayer player
 ) {
 
-    CompoundTag entryTag =
-            rosterTag.getCompound(i);
+    List<com.mkai.universalcrew.network.CrewMembersPacket.MemberData> list =
+            new ArrayList<>();
 
-    if (!entryTag.hasUUID(R_UUID)) {
-        rosterTag.remove(i);
-        rosterChanged = true;
-        continue;
-    }
-
-    UUID memberId =
-            entryTag.getUUID(R_UUID);
-
-    RosterEntry entry =
-            findRosterEntry(
-                    roster,
-                    memberId
-            );
-
-    if (entry == null) {
-        rosterTag.remove(i);
-        rosterChanged = true;
-        continue;
-    }
-
-    Mob mob =
-            findRecruit(
-                    player.getServer(),
-                    player,
-                    entry
-            );
+    List<RosterEntry> roster =
+            readRoster(player);
 
     /*
-     * Kayıtlı entity artık yoksa:
-     *
-     * - ölmüş olabilir
-     * - yok olmuş olabilir
-     *
-     * K menüsünde göstermeyelim.
+     * Ölü / artık var olmayan üyeleri roster'dan temizle.
      */
-    if (mob == null || !mob.isAlive()) {
+    ListTag rosterTag =
+            getRoster(
+                    player.getPersistentData()
+            );
 
-        rosterTag.remove(i);
-        rosterChanged = true;
+    boolean changed =
+            false;
+
+    for (
+            int i = rosterTag.size() - 1;
+            i >= 0;
+            i--
+    ) {
+
+        CompoundTag entryTag =
+                rosterTag.getCompound(i);
+
+        if (!entryTag.hasUUID(R_UUID)) {
+
+            rosterTag.remove(i);
+
+            changed = true;
+
+            continue;
+        }
+
+        UUID memberId =
+                entryTag.getUUID(
+                        R_UUID
+                );
+
+        RosterEntry entry =
+                findRosterEntry(
+                        roster,
+                        memberId
+                );
+
+        if (entry == null) {
+
+            rosterTag.remove(i);
+
+            changed = true;
+
+            continue;
+        }
+
+        Mob mob =
+                findRecruit(
+                        player.getServer(),
+                        player,
+                        entry
+                );
+
+        /*
+         * Entity artık bulunamıyorsa roster'dan
+         * kaldır.
+         */
+        if (
+                mob == null
+                        || !mob.isAlive()
+        ) {
+
+            rosterTag.remove(i);
+
+            changed = true;
+        }
     }
-}
 
-if (rosterChanged) {
+    if (changed) {
 
-    player.getPersistentData().put(
-            ROSTER,
-            rosterTag
-    );
-}
-
-        /*
-         * Liste artık mesafeye bağlı değil.
-         */
-        for (
-                RosterEntry entry :
-                roster
-        ) {
-
-            String state =
-                    entry.state();
-
-            if (
-                    state == null
-                            || state.isBlank()
-            ) {
-
-                state =
-                        "stop";
-            }
-
-            list.add(
-                    new com.mkai.universalcrew.network.CrewMembersPacket.MemberData(
-                            entry.uuid(),
-                            entry.name(),
-                            state
-                    )
-            );
-
-            if (
-                    list.size()
-                            >= MAX_CREW
-            ) {
-
-                break;
-            }
-        }
+        player.getPersistentData()
+                .put(
+                        ROSTER,
+                        rosterTag
+                );
 
         /*
-         * Aktif entity varsa gerçek state'i kullan.
+         * Değişiklik sonrası roster'i tekrar oku.
          */
-        for (
-                int i = 0;
-                i < list.size();
-                i++
+        roster =
+                readRoster(
+                        player
+                );
+    }
+
+    /*
+     * Sağ kalan bütün üyeleri packet'a koy.
+     */
+    for (
+            RosterEntry entry :
+            roster
+    ) {
+
+        Mob mob =
+                findRecruit(
+                        player.getServer(),
+                        player,
+                        entry
+                );
+
+        if (
+                mob == null
+                        || !mob.isAlive()
         ) {
 
-            var packetMember =
-                    list.get(i);
-
-            RosterEntry entry =
-                    findRosterEntry(
-                            roster,
-                            packetMember.id()
-                    );
-
-            if (entry == null) {
-                continue;
-            }
-
-            Mob mob =
-                    findRecruit(
-                            player.getServer(),
-                            player,
-                            entry
-                    );
-
-            if (mob == null) {
-                continue;
-            }
-
-            String actualState =
-                    mob.getPersistentData()
-                            .getString(
-                                    STATE
-                            );
-
-            if (actualState.isBlank()) {
-                actualState = "stop";
-            }
-
-            list.set(
-                    i,
-                    new com.mkai.universalcrew.network.CrewMembersPacket.MemberData(
-                            mob.getUUID(),
-                            entry.name(),
-                            actualState
-                    )
-            );
+            continue;
         }
 
-        com.mkai.universalcrew.network.ModNetwork.CHANNEL.send(
-                net.minecraftforge.network.PacketDistributor.PLAYER
-                        .with(
-                                () -> player
-                        ),
-                new com.mkai.universalcrew.network.CrewMembersPacket(
-                        player.getPersistentData()
-                                .getString(
-                                        CREW_NAME
-                                ),
-                        list
+        String actualState =
+                mob.getPersistentData()
+                        .getString(
+                                STATE
+                        );
+
+        if (actualState.isBlank()) {
+
+            actualState =
+                    "stop";
+        }
+
+        list.add(
+                new com.mkai.universalcrew.network.CrewMembersPacket.MemberData(
+                        mob.getUUID(),
+                        entry.name(),
+                        actualState,
+                        mob.getHealth(),
+                        mob.getMaxHealth()
                 )
         );
+
+        if (
+                list.size()
+                        >= MAX_CREW
+        ) {
+
+            break;
+        }
     }
+
+    com.mkai.universalcrew.network.ModNetwork.CHANNEL.send(
+            net.minecraftforge.network.PacketDistributor.PLAYER
+                    .with(
+                            () -> player
+                    ),
+            new com.mkai.universalcrew.network.CrewMembersPacket(
+                    player.getPersistentData()
+                            .getString(
+                                    CREW_NAME
+                            ),
+                    list
+            )
+    );
+}
 
     private static RosterEntry findRosterEntry(
             List<RosterEntry> roster,
