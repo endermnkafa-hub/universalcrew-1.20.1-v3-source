@@ -2089,254 +2089,341 @@ public final class CrewEvents {
     // =========================================================
 
     public static void commandMembers(
-            ServerPlayer captain,
-            List<UUID> ids,
-            String command
+        ServerPlayer captain,
+        List<UUID> ids,
+        String command
+) {
+
+    if (!hasCrew(captain)) {
+        return;
+    }
+
+    // =====================================================
+    // TAYFAYI DAĞIT
+    // =====================================================
+
+    if ("disband".equals(command)) {
+
+        disbandCrew(
+                captain
+        );
+
+        return;
+    }
+
+    // =====================================================
+    // KOMUTU UYGULANACAK ÜYELERİ BELİRLE
+    // =====================================================
+
+    Set<UUID> requested =
+            new HashSet<>();
+
+    /*
+     * Boş UUID listesi:
+     *
+     * KISAYOLDAN GELEN KOMUTTUR.
+     *
+     * Bu durumda TÜM ROSTER'a uygulanır.
+     */
+    if (
+            ids == null
+                    || ids.isEmpty()
     ) {
 
-        if (!hasCrew(captain)) {
-            return;
-        }
-
-        if ("disband".equals(command)) {
-
-            disbandCrew(
-                    captain
-            );
-
-            return;
-        }
-
-        if (
-                ids == null
-                        || ids.size() > MAX_CREW
-        ) {
-
-            return;
-        }
-
-        Set<UUID> requested =
-                new HashSet<>(
-                        ids
-                );
-
-        /*
-         * Artık yakınlık kontrolü yok.
-         * Roster üzerinden üyeleri buluyoruz.
-         */
         for (
                 RosterEntry entry :
                 readRoster(captain)
         ) {
 
-            if (
-                    !requested.contains(
-                            entry.uuid()
-                    )
-            ) {
+            requested.add(
+                    entry.uuid()
+            );
+        }
 
-                continue;
+    } else {
+
+        /*
+         * GUI'den gelen seçili üyeler.
+         */
+        if (ids.size() > MAX_CREW) {
+            return;
+        }
+
+        requested.addAll(
+                ids
+        );
+    }
+
+    if (requested.isEmpty()) {
+
+        return;
+    }
+
+    // =====================================================
+    // ÜYELERİ BUL
+    // =====================================================
+
+    for (
+            RosterEntry entry :
+            readRoster(captain)
+    ) {
+
+        if (
+                !requested.contains(
+                        entry.uuid()
+                )
+        ) {
+
+            continue;
+        }
+
+        /*
+         * Uzak / başka boyuttaki entity'yi
+         * roster üzerinden bul.
+         */
+        Mob mob =
+                findRecruit(
+                        captain.getServer(),
+                        captain,
+                        entry
+                );
+
+        if (mob == null) {
+            continue;
+        }
+
+        // =================================================
+        // KOMUTLAR
+        // =================================================
+
+        switch (command) {
+
+            // =============================================
+            // TAKİP
+            // =============================================
+
+            case "follow" -> {
+
+                mob.getPersistentData()
+                        .putString(
+                                STATE,
+                                "follow"
+                        );
+
+                clearCombatData(
+                        mob
+                );
+
+                mob.setTarget(null);
+
+                /*
+                 * Gemide / araçta ise ayrılsın.
+                 */
+                if (mob.isPassenger()) {
+                    mob.stopRiding();
+                }
+
+                mob.getNavigation()
+                        .stop();
+
+                /*
+                 * State'i roster'a kaydet.
+                 */
+                updateRosterState(
+                        captain,
+                        mob,
+                        "follow"
+                );
             }
 
-            Mob mob =
-                    findRecruit(
-                            captain.getServer(),
-                            captain,
-                            entry
-                    );
+            // =============================================
+            // DUR
+            // =============================================
 
-            /*
-             * Entity gerçekten bulunamazsa bile roster'da
-             * kalmaya devam eder.
-             */
-            if (mob == null) {
+            case "stop" -> {
 
-                continue;
+                mob.getPersistentData()
+                        .putString(
+                                STATE,
+                                "stop"
+                        );
+
+                clearCombatData(
+                        mob
+                );
+
+                mob.setTarget(null);
+
+                mob.getNavigation()
+                        .stop();
+
+                if (mob.isPassenger()) {
+                    mob.stopRiding();
+                }
+
+                updateRosterState(
+                        captain,
+                        mob,
+                        "stop"
+                );
             }
 
-            switch (command) {
+            // =============================================
+            // SAVUN
+            // =============================================
 
-                // =================================================
-                // FOLLOW
-                // =================================================
+            case "defend" -> {
 
-                case "follow" -> {
+                mob.getPersistentData()
+                        .putString(
+                                STATE,
+                                "defend"
+                        );
 
-                    mob.getPersistentData()
-                            .putString(
-                                    STATE,
-                                    "follow"
-                            );
+                /*
+                 * Şu an bulunduğu konumu savunma
+                 * noktası yap.
+                 */
+                mob.getPersistentData()
+                        .putDouble(
+                                DEFEND_X,
+                                mob.getX()
+                        );
 
-                    clearCombatData(
-                            mob
-                    );
+                mob.getPersistentData()
+                        .putDouble(
+                                DEFEND_Y,
+                                mob.getY()
+                        );
 
-                    mob.setTarget(null);
+                mob.getPersistentData()
+                        .putDouble(
+                                DEFEND_Z,
+                                mob.getZ()
+                        );
 
-                    if (mob.isPassenger()) {
-                        mob.stopRiding();
-                    }
+                mob.getPersistentData()
+                        .putBoolean(
+                                DEFEND_POS_SET,
+                                true
+                        );
 
-                    mob.getNavigation()
-                            .stop();
+                clearCombatData(
+                        mob
+                );
 
-                    updateRosterState(
-                            captain,
+                mob.setTarget(null);
+
+                mob.getNavigation()
+                        .stop();
+
+                updateRosterState(
+                        captain,
+                        mob,
+                        "defend"
+                );
+            }
+
+            // =============================================
+            // ATAK
+            // =============================================
+
+            case "attack" -> {
+
+                /*
+                 * Her durumda ATAK modu aktif.
+                 */
+                mob.getPersistentData()
+                        .putString(
+                                STATE,
+                                "attack"
+                        );
+
+                mob.getPersistentData()
+                        .remove(
+                                DEFEND_TARGET
+                        );
+
+                /*
+                 * Kaptanın mevcut hedefini al.
+                 */
+                LivingEntity target =
+                        findCaptainCurrentTarget(
+                                captain,
+                                mob
+                        );
+
+                if (
+                        target != null
+                                && target != captain
+                                && target != mob
+                                && !isSameCrew(
+                                mob,
+                                target
+                        )
+                ) {
+
+                    setCombatTarget(
                             mob,
-                            "follow"
-                    );
-                }
-
-                // =================================================
-                // STOP
-                // =================================================
-
-                case "stop" -> {
-
-                    mob.getPersistentData()
-                            .putString(
-                                    STATE,
-                                    "stop"
-                            );
-
-                    clearCombatData(
-                            mob
+                            target
                     );
 
-                    mob.setTarget(null);
-
-                    mob.getNavigation()
-                            .stop();
-
-                    if (mob.isPassenger()) {
-                        mob.stopRiding();
-                    }
-
-                    updateRosterState(
-                            captain,
-                            mob,
-                            "stop"
-                    );
-                }
-
-                // =================================================
-                // DEFEND
-                // =================================================
-
-                case "defend" -> {
-
-                    mob.getPersistentData()
-                            .putString(
-                                    STATE,
-                                    "defend"
-                            );
-
-                    mob.getPersistentData()
-                            .putDouble(
-                                    DEFEND_X,
-                                    mob.getX()
-                            );
-
-                    mob.getPersistentData()
-                            .putDouble(
-                                    DEFEND_Y,
-                                    mob.getY()
-                            );
-
-                    mob.getPersistentData()
-                            .putDouble(
-                                    DEFEND_Z,
-                                    mob.getZ()
-                            );
-
-                    mob.getPersistentData()
-                            .putBoolean(
-                                    DEFEND_POS_SET,
-                                    true
-                            );
-
-                    clearCombatData(
-                            mob
-                    );
-
-                    mob.setTarget(null);
-
-                    mob.getNavigation()
-                            .stop();
-
-                    updateRosterState(
-                            captain,
-                            mob,
-                            "defend"
-                    );
-                }
-
-                // =================================================
-                // ATTACK
-                // =================================================
-
-                case "attack" -> {
-
-                    mob.getPersistentData()
-                            .putString(
-                                    STATE,
-                                    "attack"
-                            );
+                } else {
 
                     mob.getPersistentData()
                             .remove(
-                                    DEFEND_TARGET
+                                    COMBAT_TARGET
                             );
 
-                    /*
-                     * ATAK komutu verildiğinde hedef
-                     * olmasa bile state attack.
-                     */
-                    LivingEntity target =
-                            findCaptainCurrentTarget(
-                                    captain,
-                                    mob
-                            );
-
-                    if (
-                            target != null
-                                    && target != captain
-                                    && target != mob
-                                    && !isSameCrew(
-                                    mob,
-                                    target
-                            )
-                    ) {
-
-                        setCombatTarget(
-                                mob,
-                                target
-                        );
-
-                    } else {
-
-                        mob.getPersistentData()
-                                .remove(
-                                        COMBAT_TARGET
-                                );
-
-                        mob.setTarget(null);
-                    }
-
-                    updateRosterState(
-                            captain,
-                            mob,
-                            "attack"
-                    );
+                    mob.setTarget(null);
                 }
+
+                updateRosterState(
+                        captain,
+                        mob,
+                        "attack"
+                );
+            }
+
+            // =============================================
+            // IŞINLA
+            // =============================================
+
+            case "teleport" -> {
+
+                /*
+                 * Doğrudan kaptanın yanına getir.
+                 *
+                 * Aynı dimension:
+                 * normal teleport
+                 *
+                 * Farklı dimension:
+                 * ServerLevel teleport
+                 */
+                teleportRecruitToOwner(
+                        mob,
+                        captain
+                );
+
+                mob.getNavigation()
+                        .stop();
+
+                updateRosterState(
+                        captain,
+                        mob,
+                        mob.getPersistentData()
+                                .getString(
+                                        STATE
+                                )
+                );
             }
         }
-
-        sendCrewMembers(
-                captain
-        );
     }
+
+    sendCrewMembers(
+            captain
+    );
+}
 
     // =========================================================
     // KOMUT DURUMU GÜNCELLE
