@@ -23,7 +23,9 @@ public final class ClientCrewState {
     public record Member(
             UUID id,
             String name,
-            String state
+            String state,
+            float health,
+            float maxHealth
     ) {
     }
 
@@ -32,14 +34,21 @@ public final class ClientCrewState {
     ) {
 
         members.clear();
-        members.addAll(incoming);
+
+        members.addAll(
+                incoming
+        );
     }
 
     public static void clearCrew() {
 
         crewName = "";
+
         logoPath = null;
-        logoBytes = new byte[0];
+
+        logoBytes =
+                new byte[0];
+
         members.clear();
     }
 }
