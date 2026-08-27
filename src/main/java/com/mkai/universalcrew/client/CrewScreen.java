@@ -3,6 +3,7 @@ package com.mkai.universalcrew.client;
 import com.mkai.universalcrew.network.CrewCommandPacket;
 import com.mkai.universalcrew.network.CrewCreatePacket;
 import com.mkai.universalcrew.network.GiveInvitePacket;
+import com.mkai.universalcrew.network.HealCrewMemberPacket;
 import com.mkai.universalcrew.network.ModNetwork;
 import com.mkai.universalcrew.network.RequestCrewMembersPacket;
 import net.minecraft.client.Minecraft;
@@ -52,10 +53,6 @@ public class CrewScreen extends Screen {
         );
     }
 
-    // =========================================================
-    // INIT
-    // =========================================================
-
     @Override
     protected void init() {
 
@@ -65,10 +62,6 @@ public class CrewScreen extends Screen {
 
         requestMembers();
     }
-
-    // =========================================================
-    // GUI
-    // =========================================================
 
     @Override
     protected void rebuildWidgets() {
@@ -91,9 +84,6 @@ public class CrewScreen extends Screen {
             buildManagementScreen();
         }
 
-        /*
-         * Artık olmayan üyelerin seçimlerini temizle.
-         */
         selected.removeIf(
                 id ->
                         ClientCrewState.members
@@ -107,7 +97,7 @@ public class CrewScreen extends Screen {
     }
 
     // =========================================================
-    // İLK KURULUM
+    // CREW OLUŞTUR
     // =========================================================
 
     private void buildCreateScreen() {
@@ -127,7 +117,9 @@ public class CrewScreen extends Screen {
                         )
                 );
 
-        nameBox.setMaxLength(32);
+        nameBox.setMaxLength(
+                32
+        );
 
         nameBox.setValue(
                 ClientCrewState.crewName
@@ -173,285 +165,315 @@ public class CrewScreen extends Screen {
     }
 
     // =========================================================
-    // CREW YÖNETİMİ
+    // YÖNETİM
     // =========================================================
 
     private void buildManagementScreen() {
 
-    int center =
-            this.width / 2;
-
-    // =====================================================
-    // DAVET
-    // =====================================================
-
-    addRenderableWidget(
-            Button.builder(
-                    Component.literal(
-                            "✉ DAVET EŞYASI"
-                    ),
-                    button ->
-                            giveInvite()
-            )
-            .bounds(
-                    center - 170,
-                    70,
-                    120,
-                    22
-            )
-            .build()
-    );
-
-    // =====================================================
-    // YENİLE
-    // =====================================================
-
-    addRenderableWidget(
-            Button.builder(
-                    Component.literal(
-                            "↻ YENİLE"
-                    ),
-                    button ->
-                            requestMembers()
-            )
-            .bounds(
-                    center - 45,
-                    70,
-                    90,
-                    22
-            )
-            .build()
-    );
-
-    int memberStartY =
-            105;
-
-    // =====================================================
-    // ÜYELER
-    // =====================================================
-
-    for (
-            int i = 0;
-            i < ClientCrewState.members.size();
-            i++
-    ) {
-
-        final int index =
-                i;
+        int center =
+                this.width / 2;
 
         addRenderableWidget(
                 Button.builder(
-                        memberLabel(i),
+                        Component.literal(
+                                "✉ DAVET EŞYASI"
+                        ),
                         button ->
-                                toggleMember(index)
+                                giveInvite()
                 )
                 .bounds(
                         center - 170,
-                        memberStartY
-                                + i * 26,
-                        340,
+                        70,
+                        120,
                         22
                 )
                 .build()
         );
-    }
 
-    int bottom =
-            Math.max(
-                    155,
-                    memberStartY
-                            + ClientCrewState.members.size()
-                            * 26
-                            + 10
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "↻ YENİLE"
+                        ),
+                        button ->
+                                requestMembers()
+                )
+                .bounds(
+                        center - 45,
+                        70,
+                        90,
+                        22
+                )
+                .build()
+        );
+
+        int memberStartY =
+                105;
+
+        for (
+                int i = 0;
+                i < ClientCrewState.members.size();
+                i++
+        ) {
+
+            final int index =
+                    i;
+
+            addRenderableWidget(
+                    Button.builder(
+                            memberLabel(i),
+                            button ->
+                                    toggleMember(index)
+                    )
+                    .bounds(
+                            center - 190,
+                            memberStartY
+                                    + i * 28,
+                            380,
+                            24
+                    )
+                    .build()
             );
+        }
 
-    // =====================================================
-    // ATAK
-    // =====================================================
+        int bottom =
+                Math.max(
+                        155,
+                        memberStartY
+                                + ClientCrewState.members.size()
+                                * 28
+                                + 10
+                );
 
-    addRenderableWidget(
-            Button.builder(
-                    Component.literal(
-                            "⚔ ATAK"
-                    ),
-                    button ->
-                            sendCommand(
-                                    "attack"
-                            )
-            )
-            .bounds(
-                    center - 170,
-                    bottom,
-                    78,
-                    24
-            )
-            .build()
-    );
+        // =====================================================
+        // ATAK
+        // =====================================================
 
-    // =====================================================
-    // TAKİP
-    // =====================================================
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "⚔ ATAK"
+                        ),
+                        button ->
+                                sendCommand(
+                                        "attack"
+                                )
+                )
+                .bounds(
+                        center - 190,
+                        bottom,
+                        82,
+                        24
+                )
+                .build()
+        );
 
-    addRenderableWidget(
-            Button.builder(
-                    Component.literal(
-                            "➜ TAKİP"
-                    ),
-                    button ->
-                            sendCommand(
-                                    "follow"
-                            )
-            )
-            .bounds(
-                    center - 84,
-                    bottom,
-                    78,
-                    24
-            )
-            .build()
-    );
+        // =====================================================
+        // TAKİP
+        // =====================================================
 
-    // =====================================================
-    // SAVUN
-    // =====================================================
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "➜ TAKİP"
+                        ),
+                        button ->
+                                sendCommand(
+                                        "follow"
+                                )
+                )
+                .bounds(
+                        center - 100,
+                        bottom,
+                        82,
+                        24
+                )
+                .build()
+        );
 
-    addRenderableWidget(
-            Button.builder(
-                    Component.literal(
-                            "🛡 SAVUN"
-                    ),
-                    button ->
-                            sendCommand(
-                                    "defend"
-                            )
-            )
-            .bounds(
-                    center + 2,
-                    bottom,
-                    78,
-                    24
-            )
-            .build()
-    );
+        // =====================================================
+        // SAVUN
+        // =====================================================
 
-    // =====================================================
-    // DUR
-    // =====================================================
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "🛡 SAVUN"
+                        ),
+                        button ->
+                                sendCommand(
+                                        "defend"
+                                )
+                )
+                .bounds(
+                        center - 10,
+                        bottom,
+                        82,
+                        24
+                )
+                .build()
+        );
 
-    addRenderableWidget(
-            Button.builder(
-                    Component.literal(
-                            "■ DUR"
-                    ),
-                    button ->
-                            sendCommand(
-                                    "stop"
-                            )
-            )
-            .bounds(
-                    center + 88,
-                    bottom,
-                    82,
-                    24
-            )
-            .build()
-    );
+        // =====================================================
+        // DUR
+        // =====================================================
 
-    // =====================================================
-    // TÜMÜNÜ SEÇ
-    // =====================================================
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "■ DUR"
+                        ),
+                        button ->
+                                sendCommand(
+                                        "stop"
+                                )
+                )
+                .bounds(
+                        center + 80,
+                        bottom,
+                        82,
+                        24
+                )
+                .build()
+        );
 
-    addRenderableWidget(
-            Button.builder(
-                    Component.literal(
-                            "TÜMÜNÜ SEÇ"
-                    ),
-                    button ->
-                            selectAll()
-            )
-            .bounds(
-                    center - 220,
-                    bottom + 32,
-                    105,
-                    22
-            )
-            .build()
-    );
+        // =====================================================
+        // İYİLEŞTİR
+        // =====================================================
 
-    // =====================================================
-    // SEÇİMİ TEMİZLE
-    // =====================================================
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "❤ İYİLEŞTİR"
+                        ),
+                        button ->
+                                healSelected()
+                )
+                .bounds(
+                        center - 190,
+                        bottom + 32,
+                        105,
+                        24
+                )
+                .build()
+        );
 
-    addRenderableWidget(
-            Button.builder(
-                    Component.literal(
-                            "SEÇİMİ TEMİZLE"
-                    ),
-                    button -> {
+        // =====================================================
+        // TÜMÜNÜ SEÇ
+        // =====================================================
 
-                        selected.clear();
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "TÜMÜNÜ SEÇ"
+                        ),
+                        button ->
+                                selectAll()
+                )
+                .bounds(
+                        center - 78,
+                        bottom + 32,
+                        105,
+                        24
+                )
+                .build()
+        );
 
-                        rebuildWidgets();
-                    }
-            )
-            .bounds(
-                    center - 108,
-                    bottom + 32,
-                    110,
-                    22
-            )
-            .build()
-    );
+        // =====================================================
+        // SEÇİMİ TEMİZLE
+        // =====================================================
 
-    // =====================================================
-    // IŞINLA
-    // =====================================================
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "SEÇİMİ TEMİZLE"
+                        ),
+                        button -> {
 
-    addRenderableWidget(
-            Button.builder(
-                    Component.literal(
-                            "✦ IŞINLA"
-                    ),
-                    button ->
-                            sendCommand(
-                                    "teleport"
-                            )
-            )
-            .bounds(
-                    center + 8,
-                    bottom + 32,
-                    100,
-                    22
-            )
-            .build()
-    );
+                            selected.clear();
 
-    // =====================================================
-    // TAYFAYI DAĞIT
-    // =====================================================
+                            rebuildWidgets();
+                        }
+                )
+                .bounds(
+                        center + 34,
+                        bottom + 32,
+                        110,
+                        24
+                )
+                .build()
+        );
 
-    addRenderableWidget(
-            Button.builder(
-                    Component.literal(
-                            "☠ TAYFAYI DAĞIT"
-                    ),
-                    button -> {
+        // =====================================================
+        // IŞINLA
+        // =====================================================
 
-                        confirmDisband =
-                                true;
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "✦ IŞINLA"
+                        ),
+                        button ->
+                                sendCommand(
+                                        "teleport"
+                                )
+                )
+                .bounds(
+                        center - 190,
+                        bottom + 62,
+                        100,
+                        24
+                )
+                .build()
+        );
 
-                        rebuildWidgets();
-                    }
-            )
-            .bounds(
-                    center + 115,
-                    bottom + 32,
-                    105,
-                    22
-            )
-            .build()
-    );
-}
+        // =====================================================
+        // TAYFAYI DAĞIT
+        // =====================================================
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "☠ TAYFAYI DAĞIT"
+                        ),
+                        button -> {
+
+                            confirmDisband =
+                                    true;
+
+                            rebuildWidgets();
+                        }
+                )
+                .bounds(
+                        center - 80,
+                        bottom + 62,
+                        160,
+                        24
+                )
+                .build()
+        );
+
+        // =====================================================
+        // KAPAT
+        // =====================================================
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal(
+                                "KAPAT"
+                        ),
+                        button ->
+                                onClose()
+                )
+                .bounds(
+                        center + 90,
+                        bottom + 62,
+                        100,
+                        24
+                )
+                .build()
+        );
+    }
 
     // =========================================================
     // ONAY
@@ -503,7 +525,7 @@ public class CrewScreen extends Screen {
     }
 
     // =========================================================
-    // ÜYE ETİKETİ
+    // ÜYE LABEL
     // =========================================================
 
     private Component memberLabel(
@@ -527,21 +549,47 @@ public class CrewScreen extends Screen {
                 ) {
 
                     case "attack" ->
-                            "  ⚔ ATAK";
+                            " ⚔ ATAK";
 
                     case "follow" ->
-                            "  ➜ TAKİP";
+                            " ➜ TAKİP";
 
                     case "defend" ->
-                            "  🛡 SAVUN";
+                            " 🛡 SAVUN";
 
                     default ->
-                            "  ■ DUR";
+                            " ■ DUR";
                 };
+
+        /*
+         * Minecraft'ta health:
+         *
+         * 2 HP = 1 kalp
+         */
+        float health =
+                Math.max(
+                        0.0F,
+                        member.health()
+                );
+
+        float maxHealth =
+                Math.max(
+                        1.0F,
+                        member.maxHealth()
+                );
+
+        String healthText =
+                String.format(
+                        "❤ %.1f/%.1f",
+                        health / 2.0F,
+                        maxHealth / 2.0F
+                );
 
         return Component.literal(
                 prefix
                         + member.name()
+                        + "  "
+                        + healthText
                         + state
         );
     }
@@ -560,6 +608,7 @@ public class CrewScreen extends Screen {
                         .id();
 
         if (!selected.add(id)) {
+
             selected.remove(id);
         }
 
@@ -606,6 +655,33 @@ public class CrewScreen extends Screen {
     }
 
     // =========================================================
+    // İYİLEŞTİR
+    // =========================================================
+
+    private void healSelected() {
+
+        /*
+         * Yanlışlıkla 12 kişinin etini tüketmemek için
+         * yalnızca BİR kişi seçilmesini istiyoruz.
+         */
+        if (selected.size() != 1) {
+            return;
+        }
+
+        UUID memberId =
+                selected.iterator()
+                        .next();
+
+        ModNetwork.CHANNEL.sendToServer(
+                new HealCrewMemberPacket(
+                        memberId
+                )
+        );
+
+        requestMembers();
+    }
+
+    // =========================================================
     // YENİLE
     // =========================================================
 
@@ -633,7 +709,7 @@ public class CrewScreen extends Screen {
     }
 
     // =========================================================
-    // CREW KAYDET
+    // KAYDET
     // =========================================================
 
     private void saveCrew() {
@@ -702,7 +778,7 @@ public class CrewScreen extends Screen {
     }
 
     // =========================================================
-    // LOGO SEÇ
+    // LOGO
     // =========================================================
 
     private void chooseLogo() {
@@ -715,9 +791,6 @@ public class CrewScreen extends Screen {
 
         try {
 
-            /*
-             * Minecraft'ın gerçek oyun klasörü.
-             */
             Path logoDirectory =
                     Minecraft.getInstance()
                             .gameDirectory
@@ -726,9 +799,6 @@ public class CrewScreen extends Screen {
                             .resolve("universalcrew")
                             .resolve("logos");
 
-            /*
-             * Klasör yoksa oluştur.
-             */
             Files.createDirectories(
                     logoDirectory
             );
@@ -740,18 +810,12 @@ public class CrewScreen extends Screen {
                             FileDialog.LOAD
                     );
 
-            /*
-             * DOĞRUDAN logo klasörünü aç.
-             */
             dialog.setDirectory(
                     logoDirectory
                             .toAbsolutePath()
                             .toString()
             );
 
-            /*
-             * Sadece PNG göster.
-             */
             dialog.setFilenameFilter(
                     (dir, name) ->
                             name != null
@@ -784,10 +848,8 @@ public class CrewScreen extends Screen {
 
             if (
                     image == null
-                            || image.getWidth()
-                            > 512
-                            || image.getHeight()
-                            > 512
+                            || image.getWidth() > 512
+                            || image.getHeight() > 512
             ) {
 
                 logoLabel =
@@ -832,7 +894,7 @@ public class CrewScreen extends Screen {
                     "Logo: "
                             + path.getFileName();
 
-        } catch (Exception ex) {
+        } catch (Exception ignored) {
 
             logoLabel =
                     "Logo seçilemedi.";
@@ -848,26 +910,22 @@ public class CrewScreen extends Screen {
 
         super.tick();
 
-        if (
-                setupMode
-                        && !confirmDisband
-                        && !ClientCrewState
-                        .crewName
-                        .isBlank()
-        ) {
-
-            rebuildWidgets();
-        }
-
+        /*
+         * GUI açıkken arada bir gerçek sağlık bilgisini
+         * tekrar iste.
+         *
+         * Böylece can göstergesi sürekli güncel kalır.
+         */
         if (
                 !setupMode
                         && !confirmDisband
-                        && ClientCrewState
-                        .crewName
-                        .isBlank()
+                        && this.minecraft != null
+                        && this.minecraft.level != null
+                        && this.minecraft.gui
+                        .getGuiTicks() % 10 == 0
         ) {
 
-            rebuildWidgets();
+            requestMembers();
         }
     }
 
