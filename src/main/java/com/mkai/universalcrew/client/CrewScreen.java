@@ -182,7 +182,7 @@ public class CrewScreen extends Screen {
                                 giveInvite()
                 )
                 .bounds(
-                        center - 170,
+                        center - 180,
                         70,
                         120,
                         22
@@ -199,7 +199,7 @@ public class CrewScreen extends Screen {
                                 requestMembers()
                 )
                 .bounds(
-                        center - 45,
+                        center - 55,
                         70,
                         90,
                         22
@@ -226,10 +226,10 @@ public class CrewScreen extends Screen {
                                     toggleMember(index)
                     )
                     .bounds(
-                            center - 190,
+                            center - 220,
                             memberStartY
                                     + i * 28,
-                            380,
+                            440,
                             24
                     )
                     .build()
@@ -260,7 +260,7 @@ public class CrewScreen extends Screen {
                                 )
                 )
                 .bounds(
-                        center - 190,
+                        center - 220,
                         bottom,
                         82,
                         24
@@ -283,7 +283,7 @@ public class CrewScreen extends Screen {
                                 )
                 )
                 .bounds(
-                        center - 100,
+                        center - 130,
                         bottom,
                         82,
                         24
@@ -306,7 +306,7 @@ public class CrewScreen extends Screen {
                                 )
                 )
                 .bounds(
-                        center - 10,
+                        center - 40,
                         bottom,
                         82,
                         24
@@ -329,7 +329,7 @@ public class CrewScreen extends Screen {
                                 )
                 )
                 .bounds(
-                        center + 80,
+                        center + 50,
                         bottom,
                         82,
                         24
@@ -350,9 +350,9 @@ public class CrewScreen extends Screen {
                                 healSelected()
                 )
                 .bounds(
-                        center - 190,
+                        center - 220,
                         bottom + 32,
-                        105,
+                        110,
                         24
                 )
                 .build()
@@ -371,7 +371,7 @@ public class CrewScreen extends Screen {
                                 selectAll()
                 )
                 .bounds(
-                        center - 78,
+                        center - 105,
                         bottom + 32,
                         105,
                         24
@@ -396,9 +396,9 @@ public class CrewScreen extends Screen {
                         }
                 )
                 .bounds(
-                        center + 34,
+                        center + 5,
                         bottom + 32,
-                        110,
+                        115,
                         24
                 )
                 .build()
@@ -419,9 +419,9 @@ public class CrewScreen extends Screen {
                                 )
                 )
                 .bounds(
-                        center - 190,
-                        bottom + 62,
-                        100,
+                        center + 125,
+                        bottom + 32,
+                        95,
                         24
                 )
                 .build()
@@ -445,9 +445,9 @@ public class CrewScreen extends Screen {
                         }
                 )
                 .bounds(
-                        center - 80,
+                        center - 220,
                         bottom + 62,
-                        160,
+                        155,
                         24
                 )
                 .build()
@@ -466,9 +466,9 @@ public class CrewScreen extends Screen {
                                 onClose()
                 )
                 .bounds(
-                        center + 90,
+                        center + 65,
                         bottom + 62,
-                        100,
+                        155,
                         24
                 )
                 .build()
@@ -561,11 +561,6 @@ public class CrewScreen extends Screen {
                             " ■ DUR";
                 };
 
-        /*
-         * Minecraft'ta health:
-         *
-         * 2 HP = 1 kalp
-         */
         float health =
                 Math.max(
                         0.0F,
@@ -661,10 +656,10 @@ public class CrewScreen extends Screen {
     private void healSelected() {
 
         /*
-         * Yanlışlıkla 12 kişinin etini tüketmemek için
-         * yalnızca BİR kişi seçilmesini istiyoruz.
+         * Bir seferde tek kişi.
          */
         if (selected.size() != 1) {
+
             return;
         }
 
@@ -832,6 +827,7 @@ public class CrewScreen extends Screen {
                     dialog.getFile()
                             == null
             ) {
+
                 return;
             }
 
@@ -848,8 +844,10 @@ public class CrewScreen extends Screen {
 
             if (
                     image == null
-                            || image.getWidth() > 512
-                            || image.getHeight() > 512
+                            || image.getWidth()
+                            > 512
+                            || image.getHeight()
+                            > 512
             ) {
 
                 logoLabel =
@@ -911,17 +909,14 @@ public class CrewScreen extends Screen {
         super.tick();
 
         /*
-         * GUI açıkken arada bir gerçek sağlık bilgisini
-         * tekrar iste.
-         *
-         * Böylece can göstergesi sürekli güncel kalır.
+         * GUI açıkken sağlık bilgisi yenilenir.
          */
         if (
                 !setupMode
                         && !confirmDisband
-                        && this.minecraft != null
-                        && this.minecraft.level != null
-                        && this.minecraft.gui
+                        && minecraft != null
+                        && minecraft.level != null
+                        && minecraft.gui
                         .getGuiTicks() % 10 == 0
         ) {
 
