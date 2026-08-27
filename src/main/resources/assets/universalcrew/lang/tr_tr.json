@@ -2,5 +2,12 @@
   "item.universalcrew.crew_invitation": "Tayfa Davetiyesi",
   "item.universalcrew.crew_egg": "Tayfa Yumurtası",
   "key.universalcrew.crew_menu": "Tayfa Menüsü",
-  "key.categories.universalcrew": "Universal Crew"
+  "key.categories.universalcrew": "Universal Crew",
+  "key.categories.universalcrew": "Universal Crew",
+  "key.universalcrew.crew_menu": "Tayfa Menüsü",
+  "key.universalcrew.follow": "Tayfa: Takip",
+  "key.universalcrew.attack": "Tayfa: Atak",
+  "key.universalcrew.defend": "Tayfa: Savun",
+  "key.universalcrew.stop": "Tayfa: Dur",
+  "key.universalcrew.teleport": "Tayfa: Işınla"
 }
