@@ -1,0 +1,26 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="MIT"
+
+[[mods]]
+modId="universalcrew"
+version="1.0.0"
+displayName="Universal Crew"
+authors="MKAI"
+description='''
+Universal Crew - Recruit and command Minecraft mobs.
+'''
+
+[[dependencies.universalcrew]]
+modId="forge"
+mandatory=true
+versionRange="[47,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.universalcrew]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.20.1,1.21)"
+ordering="NONE"
+side="BOTH"
