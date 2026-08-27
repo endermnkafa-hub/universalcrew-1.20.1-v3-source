@@ -2862,33 +2862,7 @@ public static void healRecruit(
             captain
     );
 }
-       private static int countItem(
-        Player player,
-        Item item
-) {
-
-    int total = 0;
-
-    for (
-            int i = 0;
-            i < player.getInventory()
-                    .getContainerSize();
-            i++
-    ) {
-
-        ItemStack stack =
-                player.getInventory()
-                        .getItem(i);
-
-        if (stack.is(item)) {
-
-            total +=
-                    stack.getCount();
-        }
-    }
-
-    return total;
-}
+       
     // =========================================================
     // RECRUIT TICK
     // =========================================================
