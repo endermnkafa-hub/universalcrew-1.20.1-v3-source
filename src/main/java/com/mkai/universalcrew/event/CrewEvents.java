@@ -2680,6 +2680,10 @@ public final class CrewEvents {
 // TAYFA ÜYESİ İYİLEŞTİR
 // =========================================================
 
+// =========================================================
+// TAYFA ÜYESİ İYİLEŞTİR
+// =========================================================
+
 public static void healRecruit(
         ServerPlayer captain,
         UUID memberId
@@ -2693,8 +2697,7 @@ public static void healRecruit(
         return;
     }
 
-    RosterEntry entry =
-            null;
+    RosterEntry entry = null;
 
     for (
             RosterEntry rosterEntry :
@@ -2703,14 +2706,10 @@ public static void healRecruit(
 
         if (
                 rosterEntry.uuid()
-                        .equals(
-                                memberId
-                        )
+                        .equals(memberId)
         ) {
 
-            entry =
-                    rosterEntry;
-
+            entry = rosterEntry;
             break;
         }
     }
@@ -2734,7 +2733,7 @@ public static void healRecruit(
             );
 
     /*
-     * Ölü üye.
+     * Üye artık yoksa roster'dan sil.
      */
     if (
             mob == null
@@ -2763,26 +2762,20 @@ public static void healRecruit(
                 ChatFormatting.RED
         );
 
-        sendCrewMembers(
-                captain
-        );
+        sendCrewMembers(captain);
 
         return;
     }
 
-    float missing =
+    float missingHealth =
             mob.getMaxHealth()
                     - mob.getHealth();
 
-    /*
-     * Zaten full can.
-     */
-    if (missing <= 0.0F) {
+    if (missingHealth <= 0.0F) {
 
         msg(
                 captain,
-                mob.getName()
-                        .getString()
+                mob.getName().getString()
                         + " zaten full can.",
                 ChatFormatting.YELLOW
         );
@@ -2791,27 +2784,76 @@ public static void healRecruit(
     }
 
     /*
-     * 1 kalp = 2 HP.
+     * 2 HP = 1 kalp.
      */
     int missingHearts =
-            (int)Math.ceil(
-                    missing / 2.0F
+            (int) Math.ceil(
+                    missingHealth / 2.0F
             );
 
     /*
-     * Envanterdeki pişmiş et.
+     * Pişmiş et türleri:
+     *
+     * Biftek
+     * Pişmiş domuz eti
+     * Pişmiş tavuk
+     * Pişmiş koyun eti
+     * Pişmiş tavşan
+     * Pişmiş morina
+     * Pişmiş somon
+     *
+     * Bunların hepsini kabul ediyoruz.
      */
-    int availableBeef =
-            countItem(
-                    captain,
-                    Items.COOKED_BEEF
-            );
+    ItemStack[] cookedFoods = {
 
-    if (availableBeef <= 0) {
+            new ItemStack(Items.COOKED_BEEF),
+            new ItemStack(Items.COOKED_PORKCHOP),
+            new ItemStack(Items.COOKED_CHICKEN),
+            new ItemStack(Items.COOKED_MUTTON),
+            new ItemStack(Items.COOKED_RABBIT),
+            new ItemStack(Items.COOKED_COD),
+            new ItemStack(Items.COOKED_SALMON)
+    };
+
+    /*
+     * Envanterde toplam kaç pişmiş yemek var?
+     */
+    int availableFood = 0;
+
+    for (
+            int slot = 0;
+            slot < captain.getInventory().getContainerSize();
+            slot++
+    ) {
+
+        ItemStack stack =
+                captain.getInventory()
+                        .getItem(slot);
+
+        if (stack.isEmpty()) {
+            continue;
+        }
+
+        for (
+                ItemStack cookedFood :
+                cookedFoods
+        ) {
+
+            if (stack.is(cookedFood.getItem())) {
+
+                availableFood +=
+                        stack.getCount();
+
+                break;
+            }
+        }
+    }
+
+    if (availableFood <= 0) {
 
         msg(
                 captain,
-                "Envanterinde pişmiş et yok.",
+                "Envanterinde pişmiş yiyecek yok.",
                 ChatFormatting.RED
         );
 
@@ -2819,28 +2861,73 @@ public static void healRecruit(
     }
 
     /*
-     * 1 pişmiş et = 1 kalp.
+     * 1 pişmiş yiyecek = 1 kalp.
      */
-    int hearts =
+    int heartsToHeal =
             Math.min(
                     missingHearts,
-                    availableBeef
+                    availableFood
             );
 
     /*
-     * Kullanılacak et.
+     * Önce gerçekten mevcut olan yiyecekleri
+     * tüketiyoruz.
      */
-    removeItems(
-            captain,
-            Items.COOKED_BEEF,
-            hearts
-    );
+    int remainingFood =
+            heartsToHeal;
+
+    for (
+            int slot = 0;
+            slot < captain.getInventory().getContainerSize()
+                    && remainingFood > 0;
+            slot++
+    ) {
+
+        ItemStack stack =
+                captain.getInventory()
+                        .getItem(slot);
+
+        if (stack.isEmpty()) {
+            continue;
+        }
+
+        boolean isCookedFood = false;
+
+        for (
+                ItemStack cookedFood :
+                cookedFoods
+        ) {
+
+            if (stack.is(cookedFood.getItem())) {
+
+                isCookedFood = true;
+                break;
+            }
+        }
+
+        if (!isCookedFood) {
+            continue;
+        }
+
+        int consume =
+                Math.min(
+                        remainingFood,
+                        stack.getCount()
+                );
+
+        stack.shrink(
+                consume
+        );
+
+        remainingFood -=
+                consume;
+    }
 
     /*
-     * Her et 2 HP.
+     * Her yiyecek 2 HP = 1 kalp.
      */
     mob.heal(
-            hearts * 2.0F
+            heartsToHeal * 2.0F
     );
 
     updateRosterFromEntity(
@@ -2850,10 +2937,9 @@ public static void healRecruit(
 
     msg(
             captain,
-            mob.getName()
-                    .getString()
+            mob.getName().getString()
                     + " "
-                    + hearts
+                    + heartsToHeal
                     + " kalp iyileştirildi.",
             ChatFormatting.GREEN
     );
