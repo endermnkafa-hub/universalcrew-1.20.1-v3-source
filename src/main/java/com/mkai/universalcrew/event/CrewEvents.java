@@ -1338,52 +1338,52 @@ public final class CrewEvents {
     }
 
     private static void removeItems(
-            Player player,
-            Item item,
-            int amount
+        Player player,
+        Item item,
+        int amount
+) {
+
+    if (
+            player.getAbilities()
+                    .instabuild
     ) {
 
-        if (
-                player.getAbilities()
-                        .instabuild
-        ) {
-
-            return;
-        }
-
-        int remaining =
-                amount;
-
-        for (
-                int i = 0;
-                i < player.getInventory()
-                        .getContainerSize()
-                        && remaining > 0;
-                i++
-        ) {
-
-            ItemStack stack =
-                    player.getInventory()
-                            .getItem(i);
-
-            if (!stack.is(item)) {
-                continue;
-            }
-
-            int take =
-                    Math.min(
-                            remaining,
-                            stack.getCount()
-                    );
-
-            stack.shrink(
-                    take
-            );
-
-            remaining -=
-                    take;
-        }
+        return;
     }
+
+    int remaining =
+            amount;
+
+    for (
+            int i = 0;
+            i < player.getInventory()
+                    .getContainerSize()
+                    && remaining > 0;
+            i++
+    ) {
+
+        ItemStack stack =
+                player.getInventory()
+                        .getItem(i);
+
+        if (!stack.is(item)) {
+            continue;
+        }
+
+        int take =
+                Math.min(
+                        remaining,
+                        stack.getCount()
+                );
+
+        stack.shrink(
+                take
+        );
+
+        remaining -=
+                take;
+    }
+}
 
     // =========================================================
     // RECRUIT
