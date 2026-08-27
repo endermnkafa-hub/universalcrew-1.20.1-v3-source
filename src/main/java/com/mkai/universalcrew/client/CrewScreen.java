@@ -31,6 +31,9 @@ public class CrewScreen extends Screen {
     private static final int ROW_HEIGHT = 26;
     private static final int ROW_GAP = 2;
 
+    // Liste ile alt butonlar arasında bırakılacak boşluk
+    private static final int LIST_BOTTOM_GAP = 8;
+
     private EditBox nameBox;
 
     private String logoLabel = "Logo seçilmedi";
@@ -43,9 +46,11 @@ public class CrewScreen extends Screen {
 
     private int scrollOffset = 0;
     private int visibleRows = 1;
+
     private int listTop;
     private int listBottom;
     private int controlsTop;
+
     private int refreshTicker = 0;
 
     public CrewScreen() {
@@ -55,6 +60,7 @@ public class CrewScreen extends Screen {
     @Override
     protected void init() {
         super.init();
+
         rebuildWidgets();
         requestMembers();
     }
@@ -92,38 +98,69 @@ public class CrewScreen extends Screen {
                 22,
                 Component.literal("Tayfa adı")
         );
+
         nameBox.setMaxLength(32);
         nameBox.setValue(ClientCrewState.crewName);
+
         addRenderableWidget(nameBox);
 
         addRenderableWidget(Button.builder(
                 Component.literal("📁 LOGO SEÇ"),
                 button -> chooseLogo()
-        ).bounds(center - 140, 115, 135, 24).build());
+        ).bounds(
+                center - 140,
+                115,
+                135,
+                24
+        ).build());
 
         addRenderableWidget(Button.builder(
                 Component.literal("⚓ KAYDET"),
                 button -> saveCrew()
-        ).bounds(center + 5, 115, 135, 24).build());
+        ).bounds(
+                center + 5,
+                115,
+                135,
+                24
+        ).build());
     }
 
     private void buildManagementScreen() {
         int center = width / 2;
 
+        /*
+         * ÜST BUTONLAR
+         */
+
         addRenderableWidget(Button.builder(
                 Component.literal("✉ DAVET EŞYASI"),
                 button -> giveInvite()
-        ).bounds(center - 220, 65, 115, 22).build());
+        ).bounds(
+                center - 220,
+                65,
+                115,
+                22
+        ).build());
 
         addRenderableWidget(Button.builder(
                 Component.literal("↻ YENİLE"),
                 button -> requestMembers()
-        ).bounds(center - 100, 65, 90, 22).build());
+        ).bounds(
+                center - 100,
+                65,
+                90,
+                22
+        ).build());
 
         addRenderableWidget(Button.builder(
                 Component.literal("TÜMÜNÜ SEÇ"),
                 button -> selectAll()
-        ).bounds(center - 5, 65, 100, 22).build());
+        ).bounds(
+                center - 5,
+                65,
+                100,
+                22
+        ).build());
 
         addRenderableWidget(Button.builder(
                 Component.literal("SEÇİMİ TEMİZLE"),
@@ -131,88 +168,156 @@ public class CrewScreen extends Screen {
                     selected.clear();
                     rebuildWidgets();
                 }
-        ).bounds(center + 100, 65, 125, 22).build());
+        ).bounds(
+                center + 100,
+                65,
+                125,
+                22
+        ).build());
+
+
+        /*
+         * SABİT ALT KONTROL ALANI
+         *
+         * Buradaki butonlar üye sayısından bağımsız olarak
+         * aynı yerde kalır.
+         */
+
+        controlsTop = Math.max(
+                190,
+                height - 75
+        );
+
+        /*
+         * LİSTE ALANI
+         *
+         * Liste, alt butonlara kadar olan boşluğu kullanır.
+         * Böylece üye sayısı arttığında liste aşağı taşmaz.
+         */
 
         listTop = 98;
-        controlsTop = Math.max(235, height - 100);
-        listBottom = controlsTop - 10;
+
+        listBottom = controlsTop - LIST_BOTTOM_GAP;
+
+        int availableHeight = Math.max(
+                ROW_HEIGHT,
+                listBottom - listTop
+        );
 
         visibleRows = Math.max(
                 1,
-                (listBottom - listTop + ROW_GAP) / (ROW_HEIGHT + ROW_GAP)
+                (availableHeight + ROW_GAP)
+                        / (ROW_HEIGHT + ROW_GAP)
         );
 
         int maxOffset = Math.max(
                 0,
                 ClientCrewState.members.size() - visibleRows
         );
-        scrollOffset = Math.max(0, Math.min(scrollOffset, maxOffset));
+
+        scrollOffset = Math.max(
+                0,
+                Math.min(scrollOffset, maxOffset)
+        );
 
         int end = Math.min(
                 ClientCrewState.members.size(),
                 scrollOffset + visibleRows
         );
 
+
+        /*
+         * ÜYE BUTONLARI
+         */
+
         for (int i = scrollOffset; i < end; i++) {
+
             final int index = i;
+
+            int rowY = listTop
+                    + (i - scrollOffset)
+                    * (ROW_HEIGHT + ROW_GAP);
+
             addRenderableWidget(Button.builder(
                     memberLabel(i),
                     button -> toggleMember(index)
             ).bounds(
                     center - 220,
-                    listTop + (i - scrollOffset) * (ROW_HEIGHT + ROW_GAP),
+                    rowY,
                     440,
                     ROW_HEIGHT
             ).build());
         }
 
-        if (ClientCrewState.members.size() > visibleRows) {
-            int trackHeight = Math.max(20, listBottom - listTop);
-            int thumbHeight = Math.max(
-                    20,
-                    (int) ((double) visibleRows
-                            / ClientCrewState.members.size()
-                            * trackHeight)
-            );
-            int scrollbarMaxOffset = ClientCrewState.members.size() - visibleRows;
-            int travel = Math.max(0, trackHeight - thumbHeight);
-            int thumbY = listTop + (scrollbarMaxOffset == 0
-                    ? 0
-                    : (int) ((double) scrollOffset / scrollbarMaxOffset * travel));
 
-            // Scroll bar is drawn in render(). This block only calculates
-            // positions by keeping the same layout constants.
-        }
+        /*
+         * ALT KONTROLLER
+         */
 
         addRenderableWidget(Button.builder(
                 Component.literal("⚔ ATAK"),
                 button -> sendCommand("attack")
-        ).bounds(center - 220, controlsTop, 82, 24).build());
+        ).bounds(
+                center - 220,
+                controlsTop,
+                82,
+                24
+        ).build());
 
         addRenderableWidget(Button.builder(
                 Component.literal("➜ TAKİP"),
                 button -> sendCommand("follow")
-        ).bounds(center - 130, controlsTop, 82, 24).build());
+        ).bounds(
+                center - 130,
+                controlsTop,
+                82,
+                24
+        ).build());
 
         addRenderableWidget(Button.builder(
                 Component.literal("🛡 SAVUN"),
                 button -> sendCommand("defend")
-        ).bounds(center - 40, controlsTop, 82, 24).build());
+        ).bounds(
+                center - 40,
+                controlsTop,
+                82,
+                24
+        ).build());
 
         addRenderableWidget(Button.builder(
                 Component.literal("■ DUR"),
                 button -> sendCommand("stop")
-        ).bounds(center + 50, controlsTop, 82, 24).build());
+        ).bounds(
+                center + 50,
+                controlsTop,
+                82,
+                24
+        ).build());
+
+
+        /*
+         * İKİNCİ BUTON SATIRI
+         */
 
         addRenderableWidget(Button.builder(
                 Component.literal("❤ İYİLEŞTİR"),
                 button -> healSelected()
-        ).bounds(center - 220, controlsTop + 30, 110, 24).build());
+        ).bounds(
+                center - 220,
+                controlsTop + 30,
+                110,
+                24
+        ).build());
 
         addRenderableWidget(Button.builder(
                 Component.literal("✦ IŞINLA"),
                 button -> sendCommand("teleport")
-        ).bounds(center - 105, controlsTop + 30, 90, 24).build());
+        ).bounds(
+                center - 105,
+                controlsTop + 30,
+                90,
+                24
+        ).build());
 
         addRenderableWidget(Button.builder(
                 Component.literal("☠ TAYFAYI DAĞIT"),
@@ -220,12 +325,22 @@ public class CrewScreen extends Screen {
                     confirmDisband = true;
                     rebuildWidgets();
                 }
-        ).bounds(center - 10, controlsTop + 30, 140, 24).build());
+        ).bounds(
+                center - 10,
+                controlsTop + 30,
+                140,
+                24
+        ).build());
 
         addRenderableWidget(Button.builder(
                 Component.literal("KAPAT"),
                 button -> onClose()
-        ).bounds(center + 135, controlsTop + 30, 85, 24).build());
+        ).bounds(
+                center + 135,
+                controlsTop + 30,
+                85,
+                24
+        ).build());
     }
 
     private void buildConfirmScreen() {
@@ -234,7 +349,12 @@ public class CrewScreen extends Screen {
         addRenderableWidget(Button.builder(
                 Component.literal("EVET, TAYFAYI DAĞIT"),
                 button -> disband()
-        ).bounds(center - 150, 105, 140, 24).build());
+        ).bounds(
+                center - 150,
+                105,
+                140,
+                24
+        ).build());
 
         addRenderableWidget(Button.builder(
                 Component.literal("HAYIR"),
@@ -242,13 +362,22 @@ public class CrewScreen extends Screen {
                     confirmDisband = false;
                     rebuildWidgets();
                 }
-        ).bounds(center + 10, 105, 140, 24).build());
+        ).bounds(
+                center + 10,
+                105,
+                140,
+                24
+        ).build());
     }
 
     private Component memberLabel(int index) {
-        ClientCrewState.Member member = ClientCrewState.members.get(index);
+        ClientCrewState.Member member =
+                ClientCrewState.members.get(index);
 
-        String prefix = selected.contains(member.id()) ? "✓ " : "□ ";
+        String prefix = selected.contains(member.id())
+                ? "✓ "
+                : "□ ";
+
         String state = switch (member.state()) {
             case "attack" -> " ⚔ ATAK";
             case "follow" -> " ➜ TAKİP";
@@ -256,8 +385,15 @@ public class CrewScreen extends Screen {
             default -> " ■ DUR";
         };
 
-        float health = Math.max(0.0F, member.health());
-        float maxHealth = Math.max(1.0F, member.maxHealth());
+        float health = Math.max(
+                0.0F,
+                member.health()
+        );
+
+        float maxHealth = Math.max(
+                1.0F,
+                member.maxHealth()
+        );
 
         String healthText = String.format(
                 "❤ %.1f/%.1f",
@@ -266,25 +402,39 @@ public class CrewScreen extends Screen {
         );
 
         return Component.literal(
-                prefix + member.name() + "  " + healthText + state
+                prefix
+                        + member.name()
+                        + "  "
+                        + healthText
+                        + state
         );
     }
 
     private void toggleMember(int index) {
-        UUID id = ClientCrewState.members.get(index).id();
+        UUID id =
+                ClientCrewState.members
+                        .get(index)
+                        .id();
+
         if (!selected.add(id)) {
             selected.remove(id);
         }
+
         rebuildWidgets();
     }
 
     private void selectAll() {
         selected.clear();
-        ClientCrewState.members.forEach(member -> selected.add(member.id()));
+
+        ClientCrewState.members.forEach(
+                member -> selected.add(member.id())
+        );
+
         rebuildWidgets();
     }
 
     private void sendCommand(String command) {
+
         if (selected.isEmpty()) {
             return;
         }
@@ -300,11 +450,13 @@ public class CrewScreen extends Screen {
     }
 
     private void healSelected() {
+
         if (selected.size() != 1) {
             return;
         }
 
-        UUID memberId = selected.iterator().next();
+        UUID memberId =
+                selected.iterator().next();
 
         ModNetwork.CHANNEL.sendToServer(
                 new HealCrewMemberPacket(memberId)
@@ -314,26 +466,44 @@ public class CrewScreen extends Screen {
     }
 
     private void requestMembers() {
+
         ModNetwork.CHANNEL.sendToServer(
                 new RequestCrewMembersPacket()
         );
     }
 
     public void onCrewDataUpdated() {
-        selected.removeIf(id -> ClientCrewState.members.stream()
-                .noneMatch(member -> member.id().equals(id)));
 
-        int maxOffset = Math.max(0, ClientCrewState.members.size() - visibleRows);
-        scrollOffset = Math.min(scrollOffset, maxOffset);
+        selected.removeIf(id ->
+                ClientCrewState.members.stream()
+                        .noneMatch(
+                                member -> member.id().equals(id)
+                        )
+        );
+
+        int maxOffset = Math.max(
+                0,
+                ClientCrewState.members.size()
+                        - visibleRows
+        );
+
+        scrollOffset = Math.min(
+                scrollOffset,
+                maxOffset
+        );
+
         rebuildWidgets();
     }
 
     private void saveCrew() {
+
         if (nameBox == null) {
             return;
         }
 
-        String name = nameBox.getValue().trim();
+        String name =
+                nameBox.getValue().trim();
+
         if (name.isBlank()) {
             return;
         }
@@ -341,18 +511,26 @@ public class CrewScreen extends Screen {
         ClientCrewState.crewName = name;
 
         ModNetwork.CHANNEL.sendToServer(
-                new CrewCreatePacket(name, logoBytes)
+                new CrewCreatePacket(
+                        name,
+                        logoBytes
+                )
         );
 
         setupMode = false;
+
         rebuildWidgets();
     }
 
     private void giveInvite() {
-        ModNetwork.CHANNEL.sendToServer(new GiveInvitePacket());
+
+        ModNetwork.CHANNEL.sendToServer(
+                new GiveInvitePacket()
+        );
     }
 
     private void disband() {
+
         selected.clear();
 
         ModNetwork.CHANNEL.sendToServer(
@@ -363,35 +541,54 @@ public class CrewScreen extends Screen {
         );
 
         ClientCrewState.clearCrew();
+
         confirmDisband = false;
         setupMode = true;
+
         rebuildWidgets();
     }
 
     private void chooseLogo() {
+
         if (GraphicsEnvironment.isHeadless()) {
             return;
         }
 
         try {
-            Path logoDirectory = Minecraft.getInstance()
-                    .gameDirectory
-                    .toPath()
-                    .resolve("config")
-                    .resolve("universalcrew")
-                    .resolve("logos");
 
-            Files.createDirectories(logoDirectory);
+            Path logoDirectory =
+                    Minecraft.getInstance()
+                            .gameDirectory
+                            .toPath()
+                            .resolve("config")
+                            .resolve("universalcrew")
+                            .resolve("logos");
 
-            FileDialog dialog = new FileDialog(
-                    (Frame) null,
-                    "Tayfa logosu seç",
-                    FileDialog.LOAD
+            Files.createDirectories(
+                    logoDirectory
             );
 
-            dialog.setDirectory(logoDirectory.toAbsolutePath().toString());
-            dialog.setFilenameFilter((dir, name) ->
-                    name != null && name.toLowerCase().endsWith(".png"));
+            FileDialog dialog =
+                    new FileDialog(
+                            (Frame) null,
+                            "Tayfa logosu seç",
+                            FileDialog.LOAD
+                    );
+
+            dialog.setDirectory(
+                    logoDirectory
+                            .toAbsolutePath()
+                            .toString()
+            );
+
+            dialog.setFilenameFilter(
+                    (dir, name) ->
+                            name != null
+                                    && name
+                                    .toLowerCase()
+                                    .endsWith(".png")
+            );
+
             dialog.setVisible(true);
 
             if (dialog.getFile() == null) {
@@ -403,64 +600,132 @@ public class CrewScreen extends Screen {
                     dialog.getFile()
             );
 
-            BufferedImage image = ImageIO.read(path.toFile());
+            BufferedImage image =
+                    ImageIO.read(path.toFile());
 
-            if (image == null || image.getWidth() > 512 || image.getHeight() > 512) {
-                logoLabel = "Logo 512x512'den büyük olamaz.";
+            if (
+                    image == null
+                            || image.getWidth() > 512
+                            || image.getHeight() > 512
+            ) {
+
+                logoLabel =
+                        "Logo 512x512'den büyük olamaz.";
+
                 return;
             }
 
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            ImageIO.write(image, "PNG", out);
+            ByteArrayOutputStream out =
+                    new ByteArrayOutputStream();
 
-            logoBytes = out.toByteArray();
+            ImageIO.write(
+                    image,
+                    "PNG",
+                    out
+            );
+
+            logoBytes =
+                    out.toByteArray();
 
             if (logoBytes.length > 262_144) {
-                logoBytes = new byte[0];
-                logoLabel = "Logo dosyası çok büyük.";
+
+                logoBytes =
+                        new byte[0];
+
+                logoLabel =
+                        "Logo dosyası çok büyük.";
+
                 return;
             }
 
-            ClientCrewState.logoBytes = logoBytes;
-            ClientCrewState.logoPath = path;
-            logoLabel = "Logo: " + path.getFileName();
+            ClientCrewState.logoBytes =
+                    logoBytes;
+
+            ClientCrewState.logoPath =
+                    path;
+
+            logoLabel =
+                    "Logo: "
+                            + path.getFileName();
 
         } catch (Exception ignored) {
-            logoLabel = "Logo seçilemedi.";
+
+            logoLabel =
+                    "Logo seçilemedi.";
         }
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        if (!setupMode && !confirmDisband
-                && mouseX >= width / 2 - 230
-                && mouseX <= width / 2 + 230
-                && mouseY >= listTop
-                && mouseY <= listBottom
-                && ClientCrewState.members.size() > visibleRows) {
+    public boolean mouseScrolled(
+            double mouseX,
+            double mouseY,
+            double delta
+    ) {
 
-            int maxOffset = ClientCrewState.members.size() - visibleRows;
+        /*
+         * SADECE ÜYE LİSTESİNDE SCROLL
+         *
+         * Alt butonların olduğu bölgeye gelince
+         * scroll çalışmaz.
+         */
+
+        if (
+                !setupMode
+                        && !confirmDisband
+                        && mouseX >= width / 2 - 230
+                        && mouseX <= width / 2 + 230
+                        && mouseY >= listTop
+                        && mouseY <= listBottom
+                        && ClientCrewState.members.size()
+                        > visibleRows
+        ) {
+
+            int maxOffset =
+                    ClientCrewState.members.size()
+                            - visibleRows;
+
             if (delta < 0) {
-                scrollOffset = Math.min(maxOffset, scrollOffset + 1);
+
+                scrollOffset =
+                        Math.min(
+                                maxOffset,
+                                scrollOffset + 1
+                        );
+
             } else if (delta > 0) {
-                scrollOffset = Math.max(0, scrollOffset - 1);
+
+                scrollOffset =
+                        Math.max(
+                                0,
+                                scrollOffset - 1
+                        );
             }
 
             rebuildWidgets();
+
             return true;
         }
 
-        return super.mouseScrolled(mouseX, mouseY, delta);
+        return super.mouseScrolled(
+                mouseX,
+                mouseY,
+                delta
+        );
     }
 
     @Override
     public void tick() {
+
         super.tick();
 
         if (!setupMode && !confirmDisband) {
+
             refreshTicker++;
+
             if (refreshTicker >= 10) {
+
                 refreshTicker = 0;
+
                 requestMembers();
             }
         }
@@ -473,11 +738,13 @@ public class CrewScreen extends Screen {
             int mouseY,
             float partialTick
     ) {
+
         renderBackground(graphics);
 
         int center = width / 2;
 
         if (confirmDisband) {
+
             graphics.drawCenteredString(
                     font,
                     "☠ TAYFAYI DAĞIT?",
@@ -495,6 +762,7 @@ public class CrewScreen extends Screen {
             );
 
         } else if (setupMode) {
+
             graphics.drawCenteredString(
                     font,
                     "⚓ TAYFANI KUR",
@@ -520,6 +788,7 @@ public class CrewScreen extends Screen {
             );
 
         } else {
+
             graphics.drawCenteredString(
                     font,
                     "⚓ " + ClientCrewState.crewName,
@@ -536,7 +805,12 @@ public class CrewScreen extends Screen {
                     0xAAAAAA
             );
 
+            /*
+             * ÜYE YOKSA
+             */
+
             if (ClientCrewState.members.isEmpty()) {
+
                 graphics.drawCenteredString(
                         font,
                         "Henüz tayfa üyesi yok.",
@@ -546,19 +820,58 @@ public class CrewScreen extends Screen {
                 );
             }
 
-            if (ClientCrewState.members.size() > visibleRows) {
-                int trackHeight = Math.max(20, listBottom - listTop);
-                int thumbHeight = Math.max(
-                        20,
-                        (int) ((double) visibleRows
-                                / ClientCrewState.members.size()
-                                * trackHeight)
-                );
-                int maxOffset = ClientCrewState.members.size() - visibleRows;
-                int travel = Math.max(0, trackHeight - thumbHeight);
-                int thumbY = listTop + (maxOffset == 0
-                        ? 0
-                        : (int) ((double) scrollOffset / maxOffset * travel));
+
+            /*
+             * SCROLLBAR
+             */
+
+            if (
+                    ClientCrewState.members.size()
+                            > visibleRows
+            ) {
+
+                int trackHeight =
+                        Math.max(
+                                20,
+                                listBottom - listTop
+                        );
+
+                int thumbHeight =
+                        Math.max(
+                                20,
+                                (int) (
+                                        (double) visibleRows
+                                                / ClientCrewState.members.size()
+                                                * trackHeight
+                                )
+                        );
+
+                int maxOffset =
+                        ClientCrewState.members.size()
+                                - visibleRows;
+
+                int travel =
+                        Math.max(
+                                0,
+                                trackHeight
+                                        - thumbHeight
+                        );
+
+                int thumbY =
+                        listTop
+                                + (
+                                maxOffset == 0
+                                        ? 0
+                                        : (int) (
+                                        (double) scrollOffset
+                                                / maxOffset
+                                                * travel
+                                )
+                        );
+
+                /*
+                 * Scrollbar arka planı
+                 */
 
                 graphics.fill(
                         center + 226,
@@ -567,6 +880,10 @@ public class CrewScreen extends Screen {
                         listBottom,
                         0x55333333
                 );
+
+                /*
+                 * Scrollbar hareketli parçası
+                 */
 
                 graphics.fill(
                         center + 226,
@@ -578,6 +895,11 @@ public class CrewScreen extends Screen {
             }
         }
 
-        super.render(graphics, mouseX, mouseY, partialTick);
+        super.render(
+                graphics,
+                mouseX,
+                mouseY,
+                partialTick
+        );
     }
 }
